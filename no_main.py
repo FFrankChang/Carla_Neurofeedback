@@ -16,7 +16,7 @@ left_right_hou_distance = 0
 volume_size=0.5  # 音量大小
 
 
-# 根据坐标点生成车辆
+
 class Vehicle_Traffic:
     def __init__(self, world):
         # 世界对象
