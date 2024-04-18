@@ -564,7 +564,6 @@ def create_vices(vehicle_traffic, vehicle):
         vice_locations.append(location + carla.Location(z=0.5))
     return vehicle_traffic.create_vehicle(vice_locations, vehicle_model="vehicle.mini.cooper_s_2021")
 
-
 # 获取当前车道的车辆
 def get_now_road_car(vehicle, now_lane_flag=False, left_lane_flag=False, right_lane_flag=False):
     """
