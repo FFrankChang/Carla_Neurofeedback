@@ -6,6 +6,7 @@ import pygame
 
 from disposition import *
 from config import *
+import random
 
 vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  # 驾驶状态
@@ -174,8 +175,8 @@ class Main_Car_Control:
 
                 if get_speed(self.vehicle) > self.speed_limit:  # 设置最高速度
                     throttle = 0.5
-                # elif get_speed(self.vehicle) < 90:  # 设置最低速度
-                #    set_speed(self.vehicle,90)
+                # elif get_speed(self.vehicle) < 80:  # 设置最低速度
+                #    set_speed(self.vehicle,80)
                 car_control(vehicle, steer, throttle, brake)
                 sleep(0.01)
 
@@ -224,7 +225,7 @@ class Vice_Control:
                         next_car = qian_road_car_info[0][0]  # 前车对象
                         vices_car_list = [car for car in vices_car_list if car.id != next_car.id]  # 除去前车的控制
                         self.thread_cut_speed = threading.Thread(target=brake_throttle_retard,
-                                                                 args=(next_car, -8.5, 0, 3,))  # 减速线程,第四个参数是延迟
+                                                                args=(next_car, -8.5, 0, 3,))  # 减速线程,第四个参数是延迟
                         self.thread_cut_speed.start()
 
             pid = VehiclePIDController(car, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
@@ -237,11 +238,12 @@ class Vice_Control:
                 car.destory()
 
             speed_limit = road_speed_limit[env_map.get_waypoint(car.get_location()).lane_id]  # 获取车道的速度限制
-            # print(env_map.get_waypoint(car.get_location()).lane_id)
-            result = pid.run_step(speed_limit, waypoint)
-            if get_speed(car) < speed_limit - 20:
-                set_speed(car, speed_limit)
+            speed_limit_with_noise = speed_limit + random.uniform(-5, 5)
+            result = pid.run_step(speed_limit_with_noise, waypoint)
+            if get_speed(car) < speed_limit_with_noise - 20:
+                set_speed(car, speed_limit_with_noise)
             car.apply_control(result)
+
 
 
 def right_left_lane(main_car, direction=None, min_direction=10, method="pid"):
@@ -522,49 +524,49 @@ def create_vices(vehicle_traffic, vehicle):
     """
     vice_locations = []  # 副车的坐标列表
     vehicle_location = vehicle.get_location()  # 主车坐标
-    
+    pre_distance  = 100
     # 创建前方的车流
     for i in range(number):
         # 中前
-        location = env_map.get_waypoint(vehicle_location).next((i + 1) * 90)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).next((i + 1) * pre_distance  )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右一前
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * 80)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * pre_distance )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右二前
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * 70)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * pre_distance )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左一前
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) * 80)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) *pre_distance )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左二前
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * 70)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * pre_distance )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-
+    back_distance = 10
     # 创建后方的车流，只有一排
     for i in range(1):  # 只循环一次
         # 中后
-        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * 10)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * back_distance)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右一后
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * 10)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * back_distance)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右二后
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * 10)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * back_distance)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左一后
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * 10)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * back_distance)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左二后
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * 10)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * back_distance)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
     return vehicle_traffic.create_vehicle(vice_locations, vehicle_model="vehicle.mini.cooper_s_2021")
