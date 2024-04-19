@@ -174,8 +174,8 @@ class Main_Car_Control:
 
                 if get_speed(self.vehicle) > self.speed_limit:  # 设置最高速度
                     throttle = 0.5
-                elif get_speed(self.vehicle) < 60:  # 设置最低速度
-                    set_speed(self.vehicle,60)
+                # elif get_speed(self.vehicle) < 90:  # 设置最低速度
+                #    set_speed(self.vehicle,90)
                 car_control(vehicle, steer, throttle, brake)
                 sleep(0.01)
 
@@ -525,41 +525,41 @@ def create_vices(vehicle_traffic, vehicle):
     vehicle_location = vehicle.get_location()  # 主车坐标
     next_distance = 70
     previous_distance = 70
-    for i in range(number):  # 中一
-        location = env_map.get_waypoint(vehicle_location).next((i + 1) * next_distance)[0].transform.location  # 前面车
+    for i in range(number):  # 中
+        location = env_map.get_waypoint(vehicle_location).next((i + 1) * 90)[0].transform.location  # 前面车
         vice_locations.append(location + carla.Location(z=0.5))
-        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * previous_distance)[
+        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * 10)[
             0].transform.location  # 后面车
         vice_locations.append(location + carla.Location(z=0.5))
     for i in range(number):  # 右一
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * next_distance)[
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * 80)[
             0].transform.location  # 右一前车
         vice_locations.append(location + carla.Location(z=0.5))
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * previous_distance)[
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * 10)[
             0].transform.location  # 右一后车
         vice_locations.append(location + carla.Location(z=0.5))
     for i in range(number):  # 右二
         location = \
-        env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * next_distance)[
+        env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * 70)[
             0].transform.location  # 右二前车
         vice_locations.append(location + carla.Location(z=0.5))
         location = \
-        env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * previous_distance)[
+        env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * 10)[
             0].transform.location  # 右二后车
         vice_locations.append(location + carla.Location(z=0.5))
     for i in range(number):  # 左一
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) * next_distance)[
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) * 80)[
             0].transform.location  # 左一前车
         vice_locations.append(location + carla.Location(z=0.5))
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * previous_distance)[
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * 10)[
             0].transform.location  # 左一后车
         vice_locations.append(location + carla.Location(z=0.5))
     for i in range(number):  # 左二
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * next_distance)[
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * 70)[
             0].transform.location  # 左二前车
         vice_locations.append(location + carla.Location(z=0.5))
         location = \
-        env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * previous_distance)[
+        env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * 10)[
             0].transform.location  # 左二后车
         vice_locations.append(location + carla.Location(z=0.5))
     return vehicle_traffic.create_vehicle(vice_locations, vehicle_model="vehicle.mini.cooper_s_2021")
