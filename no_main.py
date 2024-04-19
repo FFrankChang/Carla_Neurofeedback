@@ -513,7 +513,6 @@ def is_vehicle_in_front(target_vehicle, reference_vehicle):
     # 一般情况下，如果夹角小于90度，则目标车辆在主车辆的前方
     return angle < 90
 
-
 def create_vices(vehicle_traffic, vehicle):
     """
     创建车流
@@ -523,46 +522,53 @@ def create_vices(vehicle_traffic, vehicle):
     """
     vice_locations = []  # 副车的坐标列表
     vehicle_location = vehicle.get_location()  # 主车坐标
-    next_distance = 70
-    previous_distance = 70
-    for i in range(number):  # 中
-        location = env_map.get_waypoint(vehicle_location).next((i + 1) * 90)[0].transform.location  # 前面车
+    
+    # 创建前方的车流
+    for i in range(number):
+        # 中前
+        location = env_map.get_waypoint(vehicle_location).next((i + 1) * 90)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * 10)[
-            0].transform.location  # 后面车
+
+        # 右一前
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * 80)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-    for i in range(number):  # 右一
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * 80)[
-            0].transform.location  # 右一前车
+
+        # 右二前
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * 70)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * 10)[
-            0].transform.location  # 右一后车
+
+        # 左一前
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) * 80)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-    for i in range(number):  # 右二
-        location = \
-        env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * 70)[
-            0].transform.location  # 右二前车
+
+        # 左二前
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * 70)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-        location = \
-        env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * 10)[
-            0].transform.location  # 右二后车
+
+    # 创建后方的车流，只有一排
+    for i in range(1):  # 只循环一次
+        # 中后
+        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * 10)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-    for i in range(number):  # 左一
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) * 80)[
-            0].transform.location  # 左一前车
+
+        # 右一后
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * 10)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * 10)[
-            0].transform.location  # 左一后车
+
+        # 右二后
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * 10)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-    for i in range(number):  # 左二
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * 70)[
-            0].transform.location  # 左二前车
+
+        # 左一后
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * 10)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-        location = \
-        env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * 10)[
-            0].transform.location  # 左二后车
+
+        # 左二后
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * 10)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
+
     return vehicle_traffic.create_vehicle(vice_locations, vehicle_model="vehicle.mini.cooper_s_2021")
+
 
 # 获取当前车道的车辆
 def get_now_road_car(vehicle, now_lane_flag=False, left_lane_flag=False, right_lane_flag=False):

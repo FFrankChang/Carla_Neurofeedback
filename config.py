@@ -1,7 +1,7 @@
 import carla
 from disposition import *
 
-number = 2  # 车流的车辆数，指的是前车有多少辆，其他的都有
+number = 5  # 车流的车辆数，指的是前车有多少辆，其他的都有
 road_speed_limit = {
     -1: 70,
     -2: 70,
