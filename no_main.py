@@ -727,7 +727,7 @@ def get_steering_wheel_info():
     return: 方向盘、油门、刹车
     """
     # print(self.joystick.get_axis(0), (-self.joystick.get_axis(2) + 1) / 2, (-self.joystick.get_axis(3) + 1) / 2)
-    return joystick.get_axis(0), (-joystick.get_axis(2) + 1) / 2, (-joystick.get_axis(3) + 1) / 2
+    return joystick.get_axis(0), (-joystick.get_axis(1) + 1) / 2, (-joystick.get_axis(2) + 1) / 2
 
 
 def destroy_lose_vehicle(main_car):  # 销毁失控车辆
