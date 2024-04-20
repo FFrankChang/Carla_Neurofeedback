@@ -409,8 +409,11 @@ class Window:
         self.world = world
         self.vehicle = vehicle
         self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
+        self.collision_detected = False  # 添加此行来追踪碰撞状态
+
         # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 900, 600  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
+        self.fonts = {} 
         pygame.init()  # 初始化pygame
 
         # 初始化窗口设置
@@ -469,11 +472,23 @@ class Window:
         self.draw_text(f"状态：{drive_status}", 20, (0, 80))
         fps = self.clock.get_fps()
         self.draw_text(f"当前帧率：{int(fps)}", 20, (0, 100))
+        if self.collision_detected:
+            self.draw_text("Collision!", 160, (self.SCREEN_WIDTH // 2-200, self.SCREEN_HEIGHT // 2), bold=True,color=(255, 0, 0))
+            self.collision_detected = False  # 重置碰撞状态
         # 刷新屏幕
         pygame.display.flip()
 
-    def draw_text(self, word, length, position, color=(255, 0, 0)):
-        text = self.font.render(word.ljust(length), True, color)
+    def draw_text(self, word, size, position, bold=False, color=(255, 0, 0)):
+        # 检查是否已经有缓存的字体，否则创建新的
+        font_key = (size, bold)
+        if font_key not in self.fonts:
+            font = pygame.font.Font(r"TTF\宋体.ttf", size)
+            font.set_bold(bold)
+            self.fonts[font_key] = font
+        else:
+            font = self.fonts[font_key]
+        
+        text = font.render(word, True, color)
         text_rect = text.get_rect()
         text_rect.topleft = position
         self.screen.blit(text, text_rect)
@@ -885,25 +900,20 @@ def interim(vehicle, main_car_control, end_location):  # 转弯过渡
     main_car_control.stop_vehicle()  # 停止主车运行
     main_car_control.autopilot_flag = True
 
-def attach_collision_sensor(vehicle, callback_function):
+def attach_collision_sensor(vehicle, world, window):
     # 定义传感器蓝图
     collision_sensor_bp = world.get_blueprint_library().find('sensor.other.collision')
-    
-    # 设置传感器的位置和方向（相对于车辆）
+    # 设置传感器的位置
     collision_sensor_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-    
     # 在车辆上安装传感器
     collision_sensor = world.spawn_actor(collision_sensor_bp, collision_sensor_transform, attach_to=vehicle)
-    
-    # 监听碰撞事件
-    collision_sensor.listen(lambda event: callback_function(event))
-    
+    # 监听碰撞事件，并通过回调设置窗口类的标志
+    collision_sensor.listen(lambda event: handle_collision(event, window))
     return collision_sensor
 
-def handle_collision(event):
-    # 打印碰撞的详细信息
-    other_actor = event.other_actor
-    print(f"Collision detected with {other_actor.type_id} at frame {event.frame}")
+def handle_collision(event, window):
+    print(f"Collision detected with {event.other_actor.type_id} at frame {event.frame}")
+    window.collision_detected = True  # 设置窗口类中的碰撞标志
 
 if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  # 销毁所有车辆
@@ -916,9 +926,9 @@ if __name__ == '__main__':
                 end_location4])  # 划线
     vehicle_traffic = Vehicle_Traffic(world)  # 车辆创建对象
     vehicle = vehicle_traffic.create_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]  # 创建主车
-    collision_sensor = attach_collision_sensor(vehicle, handle_collision)
     destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
     window = Window(world, blueprint_library, vehicle)  # 创建窗口
+    collision_sensor = attach_collision_sensor(vehicle, world, window)
     main_car_control = Main_Car_Control(vehicle, True)  # 主车控制类
     vice_car_control = Vice_Control(vehicle)  # 副车控制类
 
