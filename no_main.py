@@ -864,6 +864,25 @@ def interim(vehicle, main_car_control, end_location):  # 转弯过渡
     main_car_control.stop_vehicle()  # 停止主车运行
     main_car_control.autopilot_flag = True
 
+def attach_collision_sensor(vehicle, callback_function):
+    # 定义传感器蓝图
+    collision_sensor_bp = world.get_blueprint_library().find('sensor.other.collision')
+    
+    # 设置传感器的位置和方向（相对于车辆）
+    collision_sensor_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
+    
+    # 在车辆上安装传感器
+    collision_sensor = world.spawn_actor(collision_sensor_bp, collision_sensor_transform, attach_to=vehicle)
+    
+    # 监听碰撞事件
+    collision_sensor.listen(lambda event: callback_function(event))
+    
+    return collision_sensor
+
+def handle_collision(event):
+    # 打印碰撞的详细信息
+    other_actor = event.other_actor
+    print(f"Collision detected with {other_actor.type_id} at frame {event.frame}")
 
 if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  # 销毁所有车辆
@@ -876,6 +895,7 @@ if __name__ == '__main__':
                 end_location4])  # 划线
     vehicle_traffic = Vehicle_Traffic(world)  # 车辆创建对象
     vehicle = vehicle_traffic.create_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]  # 创建主车
+    collision_sensor = attach_collision_sensor(vehicle, handle_collision)
     destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
     window = Window(world, blueprint_library, vehicle)  # 创建窗口
     main_car_control = Main_Car_Control(vehicle, True)  # 主车控制类
