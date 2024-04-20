@@ -173,7 +173,7 @@ class Main_Car_Control:
                 if get_speed(self.vehicle) < self.speed_limit - 10:
                     set_speed(self.vehicle, self.speed_limit)
                 self.vehicle.apply_control(result)
-                sleep(0.01)
+                sleep(0.001)
             else:
                 drive_status = "人工驾驶"
                 self.autopilot_flag = keyboard.is_pressed("e")
@@ -182,11 +182,12 @@ class Main_Car_Control:
                 steer, throttle, brake = get_steering_wheel_info()
 
                 if get_speed(self.vehicle) > self.speed_limit:  # 设置最高速度
-                    throttle = 0.5
-                # elif get_speed(self.vehicle) < 80:  # 设置最低速度
-                #    set_speed(self.vehicle,80)
+                    # throttle = 0.5
+                    print("speed > road_limit")                    
+                elif get_speed(self.vehicle) < 60:  # 设置最低速度
+                   set_speed(self.vehicle,60)
                 car_control(vehicle, steer, throttle, brake)
-                sleep(0.01)
+                sleep(0.001)
 
     def stop_vehicle(self):
         for _ in range(10):
@@ -523,6 +524,8 @@ def is_vehicle_in_front(target_vehicle, reference_vehicle):
     # 一般情况下，如果夹角小于90度，则目标车辆在主车辆的前方
     return angle < 90
 
+import random
+
 def create_vices(vehicle_traffic, vehicle):
     """
     创建车流
@@ -532,52 +535,69 @@ def create_vices(vehicle_traffic, vehicle):
     """
     vice_locations = []  # 副车的坐标列表
     vehicle_location = vehicle.get_location()  # 主车坐标
-    pre_distance  = 100
+    number = 5  # 每个方向生成的车辆数
+    max_offset = 5  # 最大偏移量
+
     # 创建前方的车流
     for i in range(number):
+        # 为每排车辆随机生成一个偏移量
+        offset_center = random.randint(-max_offset, max_offset)
+        offset_right1 = random.randint(-max_offset, max_offset)
+        offset_right2 = random.randint(-max_offset, max_offset)
+        offset_left1 = random.randint(-max_offset, max_offset)
+        offset_left2 = random.randint(-max_offset, max_offset)
+
         # 中前
-        location = env_map.get_waypoint(vehicle_location).next((i + 1) * pre_distance  )[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).next((i + 1) * 60 + offset_center)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右一前
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * pre_distance )[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * 60 + offset_right1)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右二前
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * pre_distance )[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * 60 + offset_right2)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左一前
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) *pre_distance )[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) * 60 + offset_left1)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左二前
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * pre_distance )[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * 60 + offset_left2)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-    back_distance = 10
+
     # 创建后方的车流，只有一排
     for i in range(1):  # 只循环一次
+        # 随机生成后方的偏移量
+        offset_center = random.randint(-max_offset, max_offset)
+        offset_right1 = random.randint(-max_offset, max_offset)
+        offset_right2 = random.randint(-max_offset, max_offset)
+        offset_left1 = random.randint(-max_offset, max_offset)
+        offset_left2 = random.randint(-max_offset, max_offset)
+
         # 中后
-        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * back_distance)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * 20 + offset_center)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右一后
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * back_distance)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * 20 + offset_right1)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右二后
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * back_distance)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * 20 + offset_right2)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左一后
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * back_distance)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * 20 + offset_left1)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左二后
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * back_distance)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * 20 + offset_left2)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
     return vehicle_traffic.create_vehicle(vice_locations, vehicle_model="vehicle.mini.cooper_s_2021")
+
 
 
 # 获取当前车道的车辆
@@ -735,7 +755,7 @@ def get_steering_wheel_info():
     return: 方向盘、油门、刹车
     """
     # print(self.joystick.get_axis(0), (-self.joystick.get_axis(2) + 1) / 2, (-self.joystick.get_axis(3) + 1) / 2)
-    return joystick.get_axis(0), (-joystick.get_axis(1) + 1) / 2, (-joystick.get_axis(2) + 1) / 2
+    return joystick.get_axis(0)/3, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
 
 
 def destroy_lose_vehicle(main_car):  # 销毁失控车辆
@@ -803,8 +823,9 @@ def scene_jian(vehicle, main_car_control, vice_car_control, end_location):  # �
 
     scene_status = "等待36s开始"  # 36s
     t = time.time()
-    while time.time() - t < 5:
-        scene_status = f"倒计时{int(5 - (time.time() - t))}s (简单场景)"
+    time_gap = 5
+    while time.time() - t < time_gap:
+        scene_status = f"倒计时{int(time_gap - (time.time() - t))}s (简单场景)"
         # print(f"经历了{int(time.time() - t)}s了")
         sleep(1)
     scene_status = "简单场景"
