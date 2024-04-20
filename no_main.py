@@ -1,5 +1,6 @@
 import threading
 import time
+import socket
 
 import carla
 import pygame
@@ -109,17 +110,24 @@ class Main_Car_Control:
         self.road_id = 4  # 主车所在道路id
         self.speed_limit = 100  # 主车速度限制
         self.flag = True
+        self.udp_ip = "192.168.3.9"  # IP of the destination computer
+        self.udp_port = 12345  # Port number on the destination computer
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP socket
 
     def follow_road(self):
         global drive_status, scene_status, directions, volume_size
         self.flag = True
         pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
         while self.flag:
-            self.speed_limit = road_speed_limit[env_map.get_waypoint(self.vehicle.get_location()).lane_id]  # 速度限制
+            self.speed_limit = road_speed_limit[env_map.get_waypoint(self.vehicle.get_location()).lane_id]
             if self.autopilot_flag:
                 drive_status = "自动驾驶"
-                self.autopilot_flag = not keyboard.is_pressed("q")
-
+                if keyboard.is_pressed("q"):
+                    self.autopilot_flag = False
+                    # Send data over UDP when 'q' is pressed for manual takeover
+                    message = "play"
+                    self.sock.sendto(message.encode(), (self.udp_ip, self.udp_port))
+                
                 # 瞬时速度
                 if self.instantaneous_speed:
                     if get_speed(self.vehicle) < self.speed_limit:
