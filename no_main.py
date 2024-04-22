@@ -16,7 +16,8 @@ scene_status = "简单场景"  # 干扰场景一   简单场景
 left_right_qian_distance = 0
 left_right_hou_distance = 0
 volume_size=0.5  # 音量大小
-
+global last_steer 
+last_steer =0
 
 
 class Vehicle_Traffic:
@@ -193,6 +194,7 @@ class Main_Car_Control:
         for _ in range(10):
             set_speed(self.vehicle, 0)
             sleep(0.001)
+
 
 
 # 副车控制器
@@ -494,6 +496,13 @@ class Window:
         self.screen.blit(text, text_rect)
 
 
+def smooth_steer(steer_input):
+    global last_steer
+    alpha = 0.5  # 平滑系数，调整此值以改变平滑程度
+    smoothed_steer = alpha * steer_input + (1 - alpha) * last_steer
+    last_steer = smoothed_steer
+    return smoothed_steer
+
 def car_control(vehicle, steer=0, throttle=1, brake=0):
     """
     控制车辆
@@ -504,6 +513,7 @@ def car_control(vehicle, steer=0, throttle=1, brake=0):
     :return:
     """
     # 保留三位小数，防止车辆不被控制，可能控制器只能接受三位小数
+    steer = smooth_steer(steer)
     steer = round(steer, 3)
     throttle = round(throttle, 3)
     brake = round(brake, 3)
