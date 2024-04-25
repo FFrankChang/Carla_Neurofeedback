@@ -1,13 +1,13 @@
 import threading
 import time
 import socket
-
 import carla
 import pygame
-
 from disposition import *
 from config import *
 import random
+import csv
+from datetime import datetime 
 
 vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  # 驾驶状态
@@ -18,6 +18,24 @@ left_right_hou_distance = 0
 volume_size=0.5  # 音量大小
 global last_steer 
 last_steer =0
+
+class DataRecorder:
+    def __init__(self, filename=f"mainvehicle_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv",frequency=100):
+        self.filename = filename
+        self.file = open(self.filename, 'w', newline='')
+        self.writer = csv.writer(self.file)
+        self.writer.writerow(['Timestamp', 'Speed', 'Location_x', 'Location_y', 'Location_z', 'Steer', 'Acceleration_x', 'Acceleration_y', 'Acceleration_z', 'Gyro_x', 'Gyro_y', 'Gyro_z', 'Compass', 'Lead_Vehicle_Speed'])
+        self.last_record_time = time.time()
+        self.interval = 1.0 / frequency
+
+    def record_data(self, timestamp, speed, location, steer, acceleration, gyro, compass, lead_vehicle_speed):
+        current_time = time.time()
+        if current_time - self.last_record_time >= self.interval:
+            self.writer.writerow([timestamp, speed, location.x, location.y, location.z, steer, acceleration.x, acceleration.y, acceleration.z, gyro.x, gyro.y, gyro.z, compass, lead_vehicle_speed])
+            self.last_record_time = current_time
+
+    def close(self):
+        self.file.close()
 
 
 class Vehicle_Traffic:
@@ -97,7 +115,7 @@ class Vehicle_Traffic:
 
 # 主车控制器
 class Main_Car_Control:
-    def __init__(self, main_car, instantaneous_speed=False):
+    def __init__(self, main_car, world,instantaneous_speed=False):
         """
         主车控制类
         :param main_car: 主车对象
@@ -106,7 +124,8 @@ class Main_Car_Control:
         self.vehicle = main_car  # 主车对象
         self.instantaneous_speed = instantaneous_speed  # 是否瞬时到达目标速度
         self.scene_status = "简单场景"
-
+        self.data_recorder = DataRecorder()
+        self.world = world
         self.autopilot_flag = True  # 是否自动驾驶
         self.road_id = 4  # 主车所在道路id
         self.speed_limit = 100  # 主车速度限制
@@ -114,6 +133,48 @@ class Main_Car_Control:
         self.udp_ip = "192.168.3.9"  # IP of the destination computer
         self.udp_port = 12346  # Port number on the destination computer
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP socket
+
+        imu_bp = self.world.get_blueprint_library().find('sensor.other.imu')
+        self.imu_sensor = self.world.spawn_actor(imu_bp, carla.Transform(), attach_to=self.vehicle)
+        self.imu_data = None
+        self.imu_sensor.listen(lambda data: self._on_imu_update(data))
+
+    def update_lead_vehicle(self):
+        # 获取所有车辆，剔除主车
+        vehicles = self.world.get_actors().filter('vehicle.*')
+        vehicles = [v for v in vehicles if v.id != self.vehicle.id]
+
+        # 确定前车
+        self.lead_vehicle = None
+        min_distance = float('inf')
+        vehicle_location = self.vehicle.get_location()
+        vehicle_forward = self.vehicle.get_transform().get_forward_vector()
+
+        for v in vehicles:
+            v_location = v.get_location()
+            vector_to_v = v_location - vehicle_location
+            distance = vector_to_v.length()
+            if vector_to_v.dot(vehicle_forward) > 0:  # 确认车辆在前方
+                if distance < min_distance:
+                    min_distance = distance
+                    self.lead_vehicle = v
+
+    def _on_imu_update(self, data):
+        self.imu_data = data
+        # 更新前车
+        self.update_lead_vehicle()
+        # 记录数据
+        lead_vehicle_speed = get_speed(self.lead_vehicle) if self.lead_vehicle else None
+        self.data_recorder.record_data(
+            time.time(),
+            get_speed(self.vehicle),
+            self.vehicle.get_location(),
+            get_steering_wheel_info(),
+            data.accelerometer,
+            data.gyroscope,
+            data.compass,
+            lead_vehicle_speed
+        )
 
     def follow_road(self):
         global drive_status, scene_status, directions, volume_size
@@ -191,6 +252,7 @@ class Main_Car_Control:
                 sleep(0.001)
 
     def stop_vehicle(self):
+        self.data_recorder.close()
         for _ in range(10):
             set_speed(self.vehicle, 0)
             sleep(0.001)
@@ -939,7 +1001,7 @@ if __name__ == '__main__':
     destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
     window = Window(world, blueprint_library, vehicle)  # 创建窗口
     collision_sensor = attach_collision_sensor(vehicle, world, window)
-    main_car_control = Main_Car_Control(vehicle, True)  # 主车控制类
+    main_car_control = Main_Car_Control(vehicle,world, True)  # 主车控制类
     vice_car_control = Vice_Control(vehicle)  # 副车控制类
 
     # 简单场景一
