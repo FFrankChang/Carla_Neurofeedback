@@ -24,7 +24,7 @@ class DataRecorder:
         self.filename = filename
         self.file = open(self.filename, 'w', newline='')
         self.writer = csv.writer(self.file)
-        self.writer.writerow(['Timestamp', 'Speed', 'Location_x', 'Location_y', 'Location_z', 'Steer', 'Acceleration_x', 'Acceleration_y', 'Acceleration_z', 'Gyro_x', 'Gyro_y', 'Gyro_z', 'Compass', 'Lead_Vehicle_Speed', 'Collision'])
+        self.writer.writerow(['Time', 'Speed', 'Location_x', 'Location_y', 'Location_z', 'Steer', 'Acceleration_x', 'Acceleration_y', 'Acceleration_z', 'Gyro_x', 'Gyro_y', 'Gyro_z', 'Compass', 'Lead_Vehicle_Speed', 'Lead_Vehicle_X', 'Lead_Vehicle_Y', 'Lead_Vehicle_Z', 'Collision'])
         self.last_record_time = time.time()
         self.interval = 1.0 / frequency
         self.collision_detected = False
@@ -32,11 +32,19 @@ class DataRecorder:
     def record_collision(self):
         self.collision_detected = True
 
-    def record_data(self, timestamp, speed, location, steer, acceleration, gyro, compass, lead_vehicle_speed):
+    def record_data(self, timestamp, speed, location, steer, acceleration, gyro, compass, lead_vehicle_speed, lead_vehicle_location):
         current_time = time.time()
         if current_time - self.last_record_time >= self.interval:
             collision_status = 'Yes' if self.collision_detected else 'No'
-            self.writer.writerow([timestamp, speed, location.x, location.y, location.z, steer, acceleration.x, acceleration.y, acceleration.z, gyro.x, gyro.y, gyro.z, compass, lead_vehicle_speed, collision_status])
+            self.writer.writerow([
+                timestamp, speed, location.x, location.y, location.z, steer,
+                acceleration.x, acceleration.y, acceleration.z, gyro.x, gyro.y, gyro.z,
+                compass, lead_vehicle_speed,
+                lead_vehicle_location.x if lead_vehicle_location else None,
+                lead_vehicle_location.y if lead_vehicle_location else None,
+                lead_vehicle_location.z if lead_vehicle_location else None,
+                collision_status
+            ])
             self.last_record_time = current_time
             self.collision_detected = False  # Reset collision status after recording
 
@@ -143,13 +151,11 @@ class Main_Car_Control:
         self.imu_sensor = self.world.spawn_actor(imu_bp, carla.Transform(), attach_to=self.vehicle)
         self.imu_data = None
         self.imu_sensor.listen(lambda data: self._on_imu_update(data))
+        self.lead_vehicle = None
 
     def update_lead_vehicle(self):
-        # 获取所有车辆，剔除主车
         vehicles = self.world.get_actors().filter('vehicle.*')
         vehicles = [v for v in vehicles if v.id != self.vehicle.id]
-
-        # 确定前车
         self.lead_vehicle = None
         min_distance = float('inf')
         vehicle_location = self.vehicle.get_location()
@@ -166,10 +172,10 @@ class Main_Car_Control:
 
     def _on_imu_update(self, data):
         self.imu_data = data
-        # 更新前车
         self.update_lead_vehicle()
-        # 记录数据
+        # 记录前车速度和位置
         lead_vehicle_speed = get_speed(self.lead_vehicle) if self.lead_vehicle else None
+        lead_vehicle_location = self.lead_vehicle.get_location() if self.lead_vehicle else None
         self.data_recorder.record_data(
             time.time(),
             get_speed(self.vehicle),
@@ -178,8 +184,10 @@ class Main_Car_Control:
             data.accelerometer,
             data.gyroscope,
             data.compass,
-            lead_vehicle_speed
+            lead_vehicle_speed,
+            lead_vehicle_location
         )
+
 
     def follow_road(self):
         global drive_status, scene_status, directions, volume_size
