@@ -24,19 +24,24 @@ class DataRecorder:
         self.filename = filename
         self.file = open(self.filename, 'w', newline='')
         self.writer = csv.writer(self.file)
-        self.writer.writerow(['Timestamp', 'Speed', 'Location_x', 'Location_y', 'Location_z', 'Steer', 'Acceleration_x', 'Acceleration_y', 'Acceleration_z', 'Gyro_x', 'Gyro_y', 'Gyro_z', 'Compass', 'Lead_Vehicle_Speed'])
+        self.writer.writerow(['Timestamp', 'Speed', 'Location_x', 'Location_y', 'Location_z', 'Steer', 'Acceleration_x', 'Acceleration_y', 'Acceleration_z', 'Gyro_x', 'Gyro_y', 'Gyro_z', 'Compass', 'Lead_Vehicle_Speed', 'Collision'])
         self.last_record_time = time.time()
         self.interval = 1.0 / frequency
+        self.collision_detected = False
+
+    def record_collision(self):
+        self.collision_detected = True
 
     def record_data(self, timestamp, speed, location, steer, acceleration, gyro, compass, lead_vehicle_speed):
         current_time = time.time()
         if current_time - self.last_record_time >= self.interval:
-            self.writer.writerow([timestamp, speed, location.x, location.y, location.z, steer, acceleration.x, acceleration.y, acceleration.z, gyro.x, gyro.y, gyro.z, compass, lead_vehicle_speed])
+            collision_status = 'Yes' if self.collision_detected else 'No'
+            self.writer.writerow([timestamp, speed, location.x, location.y, location.z, steer, acceleration.x, acceleration.y, acceleration.z, gyro.x, gyro.y, gyro.z, compass, lead_vehicle_speed, collision_status])
             self.last_record_time = current_time
+            self.collision_detected = False  # Reset collision status after recording
 
     def close(self):
         self.file.close()
-
 
 class Vehicle_Traffic:
     def __init__(self, world):
@@ -115,7 +120,7 @@ class Vehicle_Traffic:
 
 # 主车控制器
 class Main_Car_Control:
-    def __init__(self, main_car, world,instantaneous_speed=False):
+    def __init__(self, main_car, world,data_recorder,instantaneous_speed=False):
         """
         主车控制类
         :param main_car: 主车对象
@@ -124,7 +129,7 @@ class Main_Car_Control:
         self.vehicle = main_car  # 主车对象
         self.instantaneous_speed = instantaneous_speed  # 是否瞬时到达目标速度
         self.scene_status = "简单场景"
-        self.data_recorder = DataRecorder()
+        self.data_recorder = data_recorder
         self.world = world
         self.autopilot_flag = True  # 是否自动驾驶
         self.road_id = 4  # 主车所在道路id
@@ -972,23 +977,22 @@ def interim(vehicle, main_car_control, end_location):  # 转弯过渡
     main_car_control.stop_vehicle()  # 停止主车运行
     main_car_control.autopilot_flag = True
 
-def attach_collision_sensor(vehicle, world, window):
-    # 定义传感器蓝图
+def attach_collision_sensor(vehicle, world, window,data_recorder):
     collision_sensor_bp = world.get_blueprint_library().find('sensor.other.collision')
-    # 设置传感器的位置
     collision_sensor_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-    # 在车辆上安装传感器
     collision_sensor = world.spawn_actor(collision_sensor_bp, collision_sensor_transform, attach_to=vehicle)
-    # 监听碰撞事件，并通过回调设置窗口类的标志
-    collision_sensor.listen(lambda event: handle_collision(event, window))
+    collision_sensor.listen(lambda event: handle_collision(event, window, data_recorder))
     return collision_sensor
 
-def handle_collision(event, window):
+def handle_collision(event, window,data_recorder):
     print(f"Collision detected with {event.other_actor.type_id} at frame {event.frame}")
+    data_recorder.record_collision()
     window.collision_detected = True  # 设置窗口类中的碰撞标志
 
 if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  # 销毁所有车辆
+    data_recorder = DataRecorder()
+
     draw_arrow([easy_location8, easy_location1, interfere_one_location1, interfere_two_location1, easy_location2,
                 interfere_one_location2,
                 end_location1, easy_location3, interfere_two_location2, end_location2, easy_location4, easy_location5,
@@ -1000,8 +1004,8 @@ if __name__ == '__main__':
     vehicle = vehicle_traffic.create_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]  # 创建主车
     destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
     window = Window(world, blueprint_library, vehicle)  # 创建窗口
-    collision_sensor = attach_collision_sensor(vehicle, world, window)
-    main_car_control = Main_Car_Control(vehicle,world, True)  # 主车控制类
+    collision_sensor = attach_collision_sensor(vehicle, world, window,data_recorder)
+    main_car_control = Main_Car_Control(vehicle,world,data_recorder, True)  # 主车控制类
     vice_car_control = Vice_Control(vehicle)  # 副车控制类
 
     # 简单场景一
