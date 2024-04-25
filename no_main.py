@@ -112,7 +112,7 @@ class Main_Car_Control:
         self.speed_limit = 100  # 主车速度限制
         self.flag = True
         self.udp_ip = "192.168.3.9"  # IP of the destination computer
-        self.udp_port = 12345  # Port number on the destination computer
+        self.udp_port = 12346  # Port number on the destination computer
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP socket
 
     def follow_road(self):
