@@ -20,7 +20,7 @@ global last_steer
 last_steer =0
 
 class DataRecorder:
-    def __init__(self, filename=f"carla_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv",frequency=100):
+    def __init__(self, filename=f"./data/carla_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv",frequency=100):
         self.filename = filename
         self.file = open(self.filename, 'w', newline='')
         self.writer = csv.writer(self.file)
@@ -33,10 +33,14 @@ class DataRecorder:
     def record_collision(self):
         self.collision_detected = True
 
+    def record_mode_switch(self):
+        self.mode_switched = True
+
     def record_data(self, timestamp, speed, location, steer, acceleration, gyro, compass, lead_vehicle_speed, lead_vehicle_location):
         current_time = time.time()
         if current_time - self.last_record_time >= self.interval:
             collision_status = 'Yes' if self.collision_detected else 'No'
+            mode_switched_status = 'Yes' if self.mode_switched else ''
             self.writer.writerow([
                 timestamp, speed, location.x, location.y, location.z, steer,
                 acceleration.x, acceleration.y, acceleration.z, gyro.x, gyro.y, gyro.z,
@@ -44,10 +48,12 @@ class DataRecorder:
                 lead_vehicle_location.x if lead_vehicle_location else None,
                 lead_vehicle_location.y if lead_vehicle_location else None,
                 lead_vehicle_location.z if lead_vehicle_location else None,
-                collision_status
+                collision_status, mode_switched_status
             ])
             self.last_record_time = current_time
-            self.collision_detected = False  # Reset collision status after recording
+            self.collision_detected = False  
+            self.mode_switched = False  
+            self.file.flush()
 
     def close(self):
         self.file.close()
@@ -202,6 +208,7 @@ class Main_Car_Control:
                     self.autopilot_flag = False
                     # Send data over UDP when 'q' is pressed for manual takeover
                     message = "play"
+                    self.data_recorder.record_mode_switch()
                     self.sock.sendto(message.encode(), (self.udp_ip, self.udp_port))
                 
                 # 瞬时速度
@@ -924,7 +931,7 @@ def scene_jian(vehicle, main_car_control, vice_car_control, end_location):  # �
 
     scene_status = "等待36s开始"  # 36s
     t = time.time()
-    time_gap = 5
+    time_gap = 3
     while time.time() - t < time_gap:
         scene_status = f"倒计时{int(time_gap - (time.time() - t))}s (简单场景)"
         # print(f"经历了{int(time.time() - t)}s了")
@@ -1013,7 +1020,7 @@ if __name__ == '__main__':
     vehicle = vehicle_traffic.create_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]  # 创建主车
     destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
     window = Window(world, blueprint_library, vehicle)  # 创建窗口
-    collision_sensor = attach_collision_sensor(vehicle, world, window,data_recorder)
+    collision_sensor = attach_collision_sensor(vehicle, world, window, data_recorder)
     main_car_control = Main_Car_Control(vehicle,world,data_recorder, True)  # 主车控制类
     vice_car_control = Vice_Control(vehicle)  # 副车控制类
 
