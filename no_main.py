@@ -20,14 +20,15 @@ global last_steer
 last_steer =0
 
 class DataRecorder:
-    def __init__(self, filename=f"mainvehicle_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv",frequency=100):
+    def __init__(self, filename=f"carla_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv",frequency=100):
         self.filename = filename
         self.file = open(self.filename, 'w', newline='')
         self.writer = csv.writer(self.file)
-        self.writer.writerow(['Time', 'Speed', 'Location_x', 'Location_y', 'Location_z', 'Steer', 'Acceleration_x', 'Acceleration_y', 'Acceleration_z', 'Gyro_x', 'Gyro_y', 'Gyro_z', 'Compass', 'Lead_Vehicle_Speed', 'Lead_Vehicle_X', 'Lead_Vehicle_Y', 'Lead_Vehicle_Z', 'Collision'])
+        self.writer.writerow(['timestamp', 'Speed', 'Location_x', 'Location_y', 'Location_z', 'Steer', 'Acceleration_x', 'Acceleration_y', 'Acceleration_z', 'Gyro_x', 'Gyro_y', 'Gyro_z', 'Compass', 'Lead_Vehicle_Speed', 'Lead_Vehicle_X', 'Lead_Vehicle_Y', 'Lead_Vehicle_Z', 'Collision', 'Mode_Switched'])
         self.last_record_time = time.time()
         self.interval = 1.0 / frequency
         self.collision_detected = False
+        self.mode_switched = False
 
     def record_collision(self):
         self.collision_detected = True
