@@ -235,8 +235,8 @@ class Main_Car_Control:
                         print("正在播放")
                         pygame.mixer.music.load("music/music.mp3")
                         # pygame.mixer.music.load(r"music/music.m4a")
-                        pygame.mixer.music.play()
-                    pygame.mixer.music.set_volume(volume_size)
+                        # pygame.mixer.music.play()
+                    # pygame.mixer.music.set_volume(volume_size)
                     now_right_left_lane_info = get_now_road_car(self.vehicle, now_lane_flag=True)
                     now_lane_next_car_info = now_right_left_lane_info.get("now_lane").get("next_info")  # 前车信息
                     if now_lane_next_car_info:
@@ -332,7 +332,7 @@ class Vice_Control:
                 car.destory()
 
             speed_limit = road_speed_limit[env_map.get_waypoint(car.get_location()).lane_id]  # 获取车道的速度限制
-            speed_limit_with_noise = speed_limit + random.uniform(-5, 5)
+            speed_limit_with_noise = speed_limit 
             result = pid.run_step(speed_limit_with_noise, waypoint)
             if get_speed(car) < speed_limit_with_noise - 20:
                 set_speed(car, speed_limit_with_noise)
@@ -581,7 +581,7 @@ class Window:
 
 def smooth_steer(steer_input):
     global last_steer
-    alpha = 0.5  # 平滑系数，调整此值以改变平滑程度
+    alpha = 0.7  # 平滑系数，调整此值以改变平滑程度
     smoothed_steer = alpha * steer_input + (1 - alpha) * last_steer
     last_steer = smoothed_steer
     return smoothed_steer
@@ -632,8 +632,6 @@ def is_vehicle_in_front(target_vehicle, reference_vehicle):
     # 一般情况下，如果夹角小于90度，则目标车辆在主车辆的前方
     return angle < 90
 
-import random
-
 def create_vices(vehicle_traffic, vehicle):
     """
     创建车流
@@ -645,7 +643,8 @@ def create_vices(vehicle_traffic, vehicle):
     vehicle_location = vehicle.get_location()  # 主车坐标
     number = 5  # 每个方向生成的车辆数
     max_offset = 5  # 最大偏移量
-
+    ahead_distance = 40
+    back_distance = 40
     # 创建前方的车流
     for i in range(number):
         # 为每排车辆随机生成一个偏移量
@@ -656,24 +655,25 @@ def create_vices(vehicle_traffic, vehicle):
         offset_left2 = random.randint(-max_offset, max_offset)
 
         # 中前
-        location = env_map.get_waypoint(vehicle_location).next((i + 1) * 60 + offset_center)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).next((i + 1) * ahead_distance + offset_center)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右一前
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * 60 + offset_right1)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * ahead_distance + offset_right1)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右二前
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * 60 + offset_right2)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * ahead_distance + offset_right2)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左一前
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) * 60 + offset_left1)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) * ahead_distance + offset_left1)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左二前
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * 60 + offset_left2)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * ahead_distance + offset_left2)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
+
 
     # 创建后方的车流，只有一排
     for i in range(1):  # 只循环一次
@@ -685,23 +685,23 @@ def create_vices(vehicle_traffic, vehicle):
         offset_left2 = random.randint(-max_offset, max_offset)
 
         # 中后
-        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * 20 + offset_center)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * back_distance + offset_center)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右一后
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * 20 + offset_right1)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * back_distance + offset_right1)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 右二后
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * 20 + offset_right2)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * back_distance + offset_right2)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左一后
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * 20 + offset_left1)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * back_distance + offset_left1)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
         # 左二后
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * 20 + offset_left2)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * back_distance + offset_left2)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
     return vehicle_traffic.create_vehicle(vice_locations, vehicle_model="vehicle.mini.cooper_s_2021")
