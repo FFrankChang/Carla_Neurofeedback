@@ -232,11 +232,13 @@ class Main_Car_Control:
                         pass
                 elif scene_status == "简单场景":
                     if not pygame.mixer.music.get_busy():
-                        print("正在播放")
-                        pygame.mixer.music.load("music/music.mp3")
+                        # print("正在播放")
+                        pass
+                        # pygame.mixer.music.load("music/music.mp3")
                         # pygame.mixer.music.load(r"music/music.m4a")
                         # pygame.mixer.music.play()
                     # pygame.mixer.music.set_volume(volume_size)
+                    
                     now_right_left_lane_info = get_now_road_car(self.vehicle, now_lane_flag=True)
                     now_lane_next_car_info = now_right_left_lane_info.get("now_lane").get("next_info")  # 前车信息
                     if now_lane_next_car_info:
@@ -264,11 +266,10 @@ class Main_Car_Control:
                 # 人工控制车辆
                 steer, throttle, brake = get_steering_wheel_info()
 
-                if get_speed(self.vehicle) > self.speed_limit:  # 设置最高速度
-                    # throttle = 0.5
-                    print("speed > road_limit")                    
-                elif get_speed(self.vehicle) < 60:  # 设置最低速度
-                   set_speed(self.vehicle,60)
+                # if get_speed(self.vehicle) > self.speed_limit:  # 设置最高速度
+                #     throttle = 0.5
+                if get_speed(self.vehicle) < 80:  # 设置最低速度
+                   set_speed(self.vehicle,80)
                 car_control(vehicle, steer, throttle, brake)
                 sleep(0.001)
 
@@ -641,10 +642,10 @@ def create_vices(vehicle_traffic, vehicle):
     """
     vice_locations = []  # 副车的坐标列表
     vehicle_location = vehicle.get_location()  # 主车坐标
-    number = 5  # 每个方向生成的车辆数
+    number = 3 # 每个方向生成的车辆数
     max_offset = 5  # 最大偏移量
-    ahead_distance = 40
-    back_distance = 40
+    ahead_distance = 30
+    back_distance = 30
     # 创建前方的车流
     for i in range(number):
         # 为每排车辆随机生成一个偏移量
