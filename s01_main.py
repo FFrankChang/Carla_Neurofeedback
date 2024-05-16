@@ -494,10 +494,10 @@ class Window:
         """
         self.world = world
         self.vehicle = vehicle
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
+        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
         self.collision_detected = False  # 添加此行来追踪碰撞状态
 
-        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 900, 600  # 屏幕大小
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
         self.fonts = {} 
         pygame.init()  # 初始化pygame
