@@ -209,13 +209,14 @@ class Main_Car_Control:
             self.speed_limit = road_speed_limit[env_map.get_waypoint(self.vehicle.get_location()).lane_id]
             if self.autopilot_flag:
                 drive_status = "自动驾驶"
-                if keyboard.is_pressed("q"):
-                    self.autopilot_flag = False
-                    # Send data over UDP when 'q' is pressed for manual takeover
-                    message = "play"
-                    self.data_recorder.record_mode_switch()
-                    self.sock.sendto(message.encode(), (self.udp_ip, self.udp_port))
-                
+                for event in pygame.event.get():
+                    if event.type == pygame.JOYBUTTONDOWN:
+                        if event.button == 4 or event.button == 5:
+                            self.autopilot_flag = False
+                            # Send data over UDP when 'q' is pressed for manual takeover
+                            message = "play"
+                            self.data_recorder.record_mode_switch()
+                            self.sock.sendto(message.encode(), (self.udp_ip, self.udp_port)) 
                 # 瞬时速度
                 if self.instantaneous_speed:
                     if get_speed(self.vehicle) < self.speed_limit:
