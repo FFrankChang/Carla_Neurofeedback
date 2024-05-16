@@ -87,7 +87,12 @@ class Vehicle_Traffic:
             cars = [bp for bp in blueprint_car if vehicle_model in bp.id.lower()]
         else:
             # 获取车辆的蓝图
-            cars = self.blueprint_library.filter('*vehicle*')
+            blueprint_car = self.blueprint_library.filter('*vehicle*')
+            cars = [
+                x for x in blueprint_car 
+                if int(x.get_attribute('number_of_wheels')) == 4 
+                and x.get_attribute('has_lights').as_bool() == True
+            ]
         # 如果没有传入生成点，随机位置生成
         if not points:
             # 获取地图可创建的坐标点
@@ -705,7 +710,7 @@ def create_vices(vehicle_traffic, vehicle):
         location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * back_distance + offset_left2)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
-    return vehicle_traffic.create_vehicle(vice_locations, vehicle_model="vehicle.mini.cooper_s_2021")
+    return vehicle_traffic.create_vehicle(vice_locations)
 
 
 
