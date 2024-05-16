@@ -213,7 +213,6 @@ class Main_Car_Control:
                     if event.type == pygame.JOYBUTTONDOWN:
                         if event.button == 4 or event.button == 5:
                             self.autopilot_flag = False
-                            # Send data over UDP when 'q' is pressed for manual takeover
                             message = "play"
                             self.data_recorder.record_mode_switch()
                             self.sock.sendto(message.encode(), (self.udp_ip, self.udp_port)) 
@@ -240,10 +239,6 @@ class Main_Car_Control:
                     if not pygame.mixer.music.get_busy():
                         # print("正在播放")
                         pass
-                        # pygame.mixer.music.load("music/music.mp3")
-                        # pygame.mixer.music.load(r"music/music.m4a")
-                        # pygame.mixer.music.play()
-                    # pygame.mixer.music.set_volume(volume_size)
                     
                     now_right_left_lane_info = get_now_road_car(self.vehicle, now_lane_flag=True)
                     now_lane_next_car_info = now_right_left_lane_info.get("now_lane").get("next_info")  # 前车信息

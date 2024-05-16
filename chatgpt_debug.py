@@ -91,11 +91,6 @@ class Main_Car_Control:
         self.udp_ip = "192.168.3.9"  # IP of the destination computer
         self.udp_port = 12346  # Port number on the destination computer
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP socket
-
-        imu_bp = self.world.get_blueprint_library().find('sensor.other.imu')
-        self.imu_sensor = self.world.spawn_actor(imu_bp, carla.Transform(), attach_to=self.vehicle)
-        self.imu_data = None
-        self.imu_sensor.listen(lambda data: self._on_imu_update(data))
         self.lead_vehicle = None
 
     def update_lead_vehicle(self):
