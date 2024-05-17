@@ -92,6 +92,7 @@ class Vehicle_Traffic:
                 x for x in blueprint_car 
                 if int(x.get_attribute('number_of_wheels')) == 4 
                 and x.get_attribute('has_lights').as_bool() == True
+                and x.get_attribute('base_type').as_str() == 'car'
             ]
         # 如果没有传入生成点，随机位置生成
         if not points:
