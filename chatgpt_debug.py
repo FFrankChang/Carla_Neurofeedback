@@ -6,8 +6,7 @@ import pygame
 from disposition import *
 from config import *
 import random
-import csv
-from datetime import datetime 
+
 
 vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  # 驾驶状态
@@ -207,7 +206,6 @@ class Vice_Control:
                                         vices_car_list[self.whichOne: self.whichOne + self.thread_car_number])
                         self.whichOne += self.thread_car_number
                 sleep(0.01)
-
     def control_car(self, cars):
         global vices_car_list, scene_status
         for car in cars:
@@ -237,8 +235,6 @@ class Vice_Control:
             if get_speed(car) < speed_limit - 20:
                 set_speed(car, speed_limit)
             car.apply_control(result)
-
-
 
 def right_left_lane(main_car, direction=None, min_direction=10, method="pid"):
     """
@@ -546,61 +542,39 @@ def create_vices(vehicle_traffic, vehicle):
     back_distance = 30
     # 创建前方的车流
     for i in range(number):
-        # 为每排车辆随机生成一个偏移量
-        offset_center = random.randint(-max_offset, max_offset)
-        offset_right1 = random.randint(-max_offset, max_offset)
-        offset_right2 = random.randint(-max_offset, max_offset)
-        offset_left1 = random.randint(-max_offset, max_offset)
-        offset_left2 = random.randint(-max_offset, max_offset)
-
         # 中前
-        location = env_map.get_waypoint(vehicle_location).next((i + 1) * ahead_distance + offset_center)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).next((i + 1) * ahead_distance )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-
         # 右一前
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * ahead_distance + offset_right1)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().next((i + 1) * ahead_distance )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-
         # 右二前
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * ahead_distance + offset_right2)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().next((i + 1) * ahead_distance )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-
         # 左一前
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) * ahead_distance + offset_left1)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().next((i + 1) * ahead_distance )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-
         # 左二前
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * ahead_distance + offset_left2)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().next((i + 1) * ahead_distance)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
 
     # 创建后方的车流，只有一排
     for i in range(1):  # 只循环一次
-        # 随机生成后方的偏移量
-        offset_center = random.randint(-max_offset, max_offset)
-        offset_right1 = random.randint(-max_offset, max_offset)
-        offset_right2 = random.randint(-max_offset, max_offset)
-        offset_left1 = random.randint(-max_offset, max_offset)
-        offset_left2 = random.randint(-max_offset, max_offset)
-
         # 中后
-        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * back_distance + offset_center)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).previous((i + 1) * back_distance )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-
         # 右一后
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * back_distance + offset_right1)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().previous((i + 1) * back_distance )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-
         # 右二后
-        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * back_distance + offset_right2)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_right_lane().get_right_lane().previous((i + 1) * back_distance )[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-
         # 左一后
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * back_distance + offset_left1)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().previous((i + 1) * back_distance)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
-
         # 左二后
-        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * back_distance + offset_left2)[0].transform.location
+        location = env_map.get_waypoint(vehicle_location).get_left_lane().get_left_lane().previous((i + 1) * back_distance)[0].transform.location
         vice_locations.append(location + carla.Location(z=0.5))
 
     return vehicle_traffic.create_vehicle(vice_locations)
