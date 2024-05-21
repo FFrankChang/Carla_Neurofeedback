@@ -233,10 +233,9 @@ class Vice_Control:
                 car.destory()
 
             speed_limit = road_speed_limit[env_map.get_waypoint(car.get_location()).lane_id]  # 获取车道的速度限制
-            speed_limit_with_noise = speed_limit 
-            result = pid.run_step(speed_limit_with_noise, waypoint)
-            if get_speed(car) < speed_limit_with_noise - 20:
-                set_speed(car, speed_limit_with_noise)
+            result = pid.run_step(speed_limit, waypoint)
+            if get_speed(car) < speed_limit - 20:
+                set_speed(car, speed_limit)
             car.apply_control(result)
 
 
