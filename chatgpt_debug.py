@@ -148,9 +148,6 @@ class Main_Car_Control:
                         pass
                     now_right_left_lane_info = get_now_road_car(self.vehicle, now_lane_flag=True)
                     now_lane_next_car_info = now_right_left_lane_info.get("now_lane").get("next_info")  # 前车信息
-                    if now_lane_next_car_info:
-                        if now_lane_next_car_info[0][1] < 80:
-                            print("请接管！！！！！！！！！！！！")
                 # 获取前方道路
                 waypoint = env_map.get_waypoint(self.vehicle.get_location()).next(
                     max(1, int(get_speed(self.vehicle) / 3)))
