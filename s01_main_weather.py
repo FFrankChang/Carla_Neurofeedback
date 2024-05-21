@@ -233,16 +233,17 @@ class Vice_Control:
         for car in cars:
             if scene_status == "简单场景" or scene_status == "干扰场景一":
                 if not self.thread_cut_speed.is_alive():  # 如果没有车减速
-                    # print("前车开始减速")
-                    qian_road_car_info = get_now_road_car(self.main_car, now_lane_flag=True).get("now_lane").get(
-                        "next_info")
-                    if qian_road_car_info:
-                        next_car = qian_road_car_info[0][0]  # 前车对象
-                        vices_car_list = [car for car in vices_car_list if car.id != next_car.id]  # 除去前车的控制
-                        self.thread_cut_speed = threading.Thread(target=brake_throttle_retard,
-                                                                args=(next_car, -8.5, 0, 3,))  # 减速线程,第四个参数是延迟
-                        self.thread_cut_speed.start()
-
+                    qian_road_car_info = get_now_road_car(self.main_car, now_lane_flag=True).get("now_lane").get("next_info")
+                    if qian_road_car_info and len(qian_road_car_info) >= 2:
+                        for i in range(2):  
+                            next_car = qian_road_car_info[i][0]  # 获取前车对象
+                            if i==0:
+                                vices_car_list = [car for car in vices_car_list if car.id != next_car.id]
+                            if next_car:
+                                self.thread_cut_speed = threading.Thread(target=brake_throttle_retard,
+                                                                         args=(next_car, -8.5, 0, 3,))
+                                self.thread_cut_speed.start()
+                                
             pid = VehiclePIDController(car, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
             # 获取前方道路
             waypoint = env_map.get_waypoint(car.get_location()).next(max(1, int(get_speed(car) / 6)))
