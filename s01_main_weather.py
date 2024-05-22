@@ -396,7 +396,7 @@ def draw_line(location1=None, location2=None, locations=None, thickness=0.1, lif
 
 # 设置刹车灯
 def set_brake_lights(vehicle):
-    lights = carla.VehicleLightState.Brake
+    lights = carla.VehicleLightState.All
     # # 设置车辆的灯光状态
     vehicle.set_light_state(carla.VehicleLightState(lights))
 
