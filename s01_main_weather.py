@@ -234,14 +234,14 @@ class Vice_Control:
             if scene_status == "简单场景" or scene_status == "干扰场景一":
                 if not self.thread_cut_speed.is_alive():  # 如果没有车减速
                     qian_road_car_info = get_now_road_car(self.main_car, now_lane_flag=True).get("now_lane").get("next_info")
-                    if qian_road_car_info and len(qian_road_car_info) >= 2:
-                        for i in range(2):  
-                            next_car = qian_road_car_info[i][0]  # 获取前车对象
-                            if i==0:
+                    if qian_road_car_info:
+                        for i, car_info in enumerate(qian_road_car_info):  
+                            next_car = car_info[0]  # 获取前车对象
+                            if i == 0:
                                 vices_car_list = [car for car in vices_car_list if car.id != next_car.id]
                             if next_car:
-                                self.thread_cut_speed = threading.Thread(target=brake_throttle_retard,
-                                                                         args=(next_car, -8.5, 0, 3,))
+                                self.thread_cut_speed = threading.Thread(target=self.brake_throttle_retard,
+                                                                        args=(next_car, -8.5, 0, 3, i == 0))
                                 self.thread_cut_speed.start()
                                 
             pid = VehiclePIDController(car, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
@@ -251,14 +251,65 @@ class Vice_Control:
                 waypoint = waypoint[0]
             else:
                 print(f"前方没有路了,当前车子坐标{car.get_location()},车子对象为{car}")
-                car.destory()
+                car.destroy()
 
             speed_limit = road_speed_limit[env_map.get_waypoint(car.get_location()).lane_id]  # 获取车道的速度限制
-            speed_limit_with_noise = speed_limit 
-            result = pid.run_step(speed_limit_with_noise, waypoint)
-            if get_speed(car) < speed_limit_with_noise - 20:
-                set_speed(car, speed_limit_with_noise)
+            result = pid.run_step(speed_limit, waypoint)
+            if get_speed(car) < speed_limit - 20:
+                set_speed(car, speed_limit)
             car.apply_control(result)
+
+    def brake_throttle_retard(self,vehicle, acceleration, target_speed, delay=0, show_brake_lights=False):
+        """
+        加减速
+        :param vehicle: 目标车辆
+        :param acceleration: 加速度
+        :param target_speed: 目标速度
+        :param delay: 延迟
+        :param show_brake_lights: 是否显示刹车灯
+        :return:
+        """
+        pid = VehiclePIDController(vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
+        t = time.time()
+        time.sleep(0.1)
+        speed = get_speed(vehicle)
+        while time.time() - t < delay:
+            # 获取前方道路
+            waypoint = env_map.get_waypoint(vehicle.get_location()).next(max(1, int(get_speed(vehicle) / 6)))
+            if waypoint:
+                waypoint = waypoint[0]
+            else:
+                print(f"前方没有路了,当前车子坐标{vehicle.get_location()},车子对象为{vehicle}")
+                return
+            result = pid.run_step(speed, waypoint)
+            vehicle.apply_control(result)
+            time.sleep(0.01)
+        if acceleration < 0:
+            if show_brake_lights:
+                set_brake_lights(vehicle)
+        t = time.time()
+        speed = get_speed(vehicle)
+        while abs(get_speed(vehicle) - target_speed) > 1:
+            # 获取前方道路
+            waypoint = env_map.get_waypoint(vehicle.get_location()).next(
+                max(1, int(get_speed(vehicle) / 6)))
+            if waypoint:
+                waypoint = waypoint[0]
+            else:
+                print(f"前方没有路了,当前车子坐标{vehicle.get_location()},车子对象为{vehicle}")
+                return
+            result = pid.run_step(0, waypoint)
+            result.brake = 1
+            result.throttle = 0
+            vehicle.apply_control(result)
+
+            sp = speed + acceleration * (time.time() - t) * 3.6
+            sp = (max(0, sp))
+            set_speed(vehicle, sp)
+            time.sleep(0.01)
+        for _ in range(10):
+            set_speed(vehicle, target_speed)
+            time.sleep(0.01)
 
 
 
@@ -351,57 +402,7 @@ def set_brake_lights(vehicle):
 
 
 # 加速度加减速
-def brake_throttle_retard(vehicle, acceleration, target_speed, delay=0):
-    """
-    加减速
-    :param vehicle: 目标车辆
-    :param acceleration: 加速度
-    :param target_speed: 目标速度
-    :param delay: 延迟
-    :return:
-    """
-    pid = VehiclePIDController(vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
-    t = time.time()
-    sleep(0.1)
-    speed = get_speed(vehicle)
-    while time.time() - t < delay:
-        # 获取前方道路
-        waypoint = env_map.get_waypoint(vehicle.get_location()).next(max(1, int(get_speed(vehicle) / 6)))
-        if waypoint:
-            waypoint = waypoint[0]
-        else:
-            print(f"前方没有路了,当前车子坐标{vehicle.get_location()},车子对象为{vehicle}")
-            return
-        result = pid.run_step(speed, waypoint)
-        vehicle.apply_control(result)
-        sleep(0.01)
-    if acceleration < 0:
-        # print(f"我开始减速了")
-        pass
-    set_brake_lights(vehicle)
-    t = time.time()
-    speed = get_speed(vehicle)
-    while abs(get_speed(vehicle) - target_speed) > 1:
-        # 获取前方道路
-        waypoint = env_map.get_waypoint(vehicle.get_location()).next(
-            max(1, int(get_speed(vehicle) / 6)))
-        if waypoint:
-            waypoint = waypoint[0]
-        else:
-            print(f"前方没有路了,当前车子坐标{vehicle.get_location()},车子对象为{vehicle}")
-            return
-        result = pid.run_step(0, waypoint)
-        result.brake = 1
-        result.throttle = 0
-        vehicle.apply_control(result)
 
-        sp = speed + acceleration * (time.time() - t) * 3.6
-        sp = (max(0, sp))
-        set_speed(vehicle, sp)
-        sleep(0.01)
-    for _ in range(10):
-        set_speed(vehicle, target_speed)
-        sleep(0.01)
 
 
 class Window:

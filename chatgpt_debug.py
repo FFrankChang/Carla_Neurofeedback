@@ -14,7 +14,6 @@ directions = []  # 变道顺序, 前提前方有车
 scene_status = "简单场景"  # 干扰场景一   简单场景
 left_right_qian_distance = 0
 left_right_hou_distance = 0
-volume_size=0.5  # 音量大小
 global last_steer 
 last_steer =0
 
@@ -111,7 +110,7 @@ class Main_Car_Control:
 
 
     def follow_road(self):
-        global drive_status, scene_status, directions, volume_size
+        global drive_status, scene_status, directions
         self.flag = True
         pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
         while self.flag:
