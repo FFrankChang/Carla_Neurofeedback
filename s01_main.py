@@ -12,7 +12,7 @@ from datetime import datetime
 vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  # 驾驶状态
 directions = []  # 变道顺序, 前提前方有车
-scene_status = "简单场景"  # 干扰场景一   简单场景
+scene_status = ""  # 干扰场景一   简单场景
 left_right_qian_distance = 0
 left_right_hou_distance = 0
 volume_size=0.5  # 音量大小
