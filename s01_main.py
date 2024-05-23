@@ -245,7 +245,7 @@ class Main_Car_Control:
                     now_right_left_lane_info = get_now_road_car(self.vehicle, now_lane_flag=True)
                     now_lane_next_car_info = now_right_left_lane_info.get("now_lane").get("next_info")  # 前车信息
                     if now_lane_next_car_info:
-                        if now_lane_next_car_info[0][1] < 80 and not takeover_prompted:  # 检查是否已经提示过接管
+                        if  not takeover_prompted:  # 检查是否已经提示过接管
                             print("请接管！！！！！！！！！！！！")
                             message = "tor"
                             self.sock.sendto(message.encode(), (self.udp_ip, self.udp_port))
