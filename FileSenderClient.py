@@ -37,6 +37,6 @@ def select_files_and_send(server_ip, server_port):
             send_file(server_ip, server_port, file_path)
 
 if __name__ == "__main__":
-    server_ip = "127.0.0.1"
+    server_ip = "192.168.3.9"
     server_port = 7999
     select_files_and_send(server_ip, server_port)
