@@ -270,7 +270,7 @@ class Main_Car_Control:
                 self.autopilot_flag = keyboard.is_pressed("e")
 
                 # 人工控制车辆
-                steer, throttle, brake = get_steering_wheel_info()
+                steer, throttle, brake = get_steering_wheel_info_modified()
 
                 # if get_speed(self.vehicle) > self.speed_limit:  # 设置最高速度
                 #     throttle = 0.5
@@ -587,7 +587,7 @@ class Window:
 
 def smooth_steer(steer_input):
     global last_steer
-    alpha = 0.7  # 平滑系数，调整此值以改变平滑程度
+    alpha = 0.8  # 平滑系数，调整此值以改变平滑程度
     smoothed_steer = alpha * steer_input + (1 - alpha) * last_steer
     last_steer = smoothed_steer
     return smoothed_steer
@@ -645,11 +645,11 @@ def create_vices(vehicle_traffic, vehicle):
     :param vehicle: 主车
     :return: 返回车流的车辆列表
     """
-    vice_locations = []  # 副车的坐标列表
+    vice_locations = []  # 副车的坐标列表n
     vehicle_location = vehicle.get_location()  # 主车坐标
-    number = 3 # 每个方向生成的车辆数
+    number = 5 # 每个方向生成的车辆数
     max_offset = 5  # 最大偏移量
-    ahead_distance = 30
+    ahead_distance = 40
     back_distance = 30
     # 创建前方的车流
     for i in range(number):
@@ -864,11 +864,12 @@ def set_speed(vehicle, speed_kmh):
 
 
 # 获取方向盘信息
-def get_steering_wheel_info():
+def get_steering_wheel_info_modified():
 
     def non_linear_steering(x):
-        return x * (1 - abs(x) ** 2)  
-
+        p = 2
+        return np.sign(x) * np.abs(x)**p
+    
     steering = joystick.get_axis(0)
     throttle = joystick.get_axis(1)
     brake = joystick.get_axis(2)
@@ -878,6 +879,13 @@ def get_steering_wheel_info():
 
     return adjusted_steering, adjusted_throttle, adjusted_brake
 
+def get_steering_wheel_info():
+    steering = joystick.get_axis(0)
+    throttle = joystick.get_axis(1)
+    brake = joystick.get_axis(2)
+    adjusted_throttle = (-throttle + 1) / 2
+    adjusted_brake = (-brake + 1) / 2
+    return steering, adjusted_throttle, adjusted_brake
 
 def destroy_lose_vehicle(main_car):  
     global vices_car_list
@@ -930,7 +938,7 @@ def scene_jian(vehicle, main_car_control, vice_car_control, end_location):  # �
 
     scene_status = "等待36s开始"  # 36s
     t = time.time()
-    time_gap = 36
+    time_gap = 3
     while time.time() - t < time_gap:
         scene_status = f"倒计时{int(time_gap - (time.time() - t))}s (简单场景)"
         # print(f"经历了{int(time.time() - t)}s了")
@@ -1017,6 +1025,17 @@ if __name__ == '__main__':
                 end_location4])  # 划线
     vehicle_traffic = Vehicle_Traffic(world)  # 车辆创建对象
     vehicle = vehicle_traffic.create_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]  # 创建主车
+
+    physics_control = vehicle.get_physics_control() # 修改车辆控制参数
+    steering_curve = [
+        carla.Vector2D(x=0.0, y=1.0),
+        carla.Vector2D(x=20.0, y=0.8),
+        carla.Vector2D(x=80.0, y=0.3),
+        carla.Vector2D(x=120.0, y=0.1)
+    ]
+    physics_control.steering_curve = steering_curve
+    vehicle.apply_physics_control(physics_control)
+
     destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
     window = Window(world, blueprint_library, vehicle)  # 创建窗口
     collision_sensor = attach_collision_sensor(vehicle, world, window, data_recorder)
