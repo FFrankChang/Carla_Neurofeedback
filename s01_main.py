@@ -865,14 +865,21 @@ def set_speed(vehicle, speed_kmh):
 
 # 获取方向盘信息
 def get_steering_wheel_info():
-    """
-    return: 方向盘、油门、刹车
-    """
-    # print(self.joystick.get_axis(0), (-self.joystick.get_axis(2) + 1) / 2, (-self.joystick.get_axis(3) + 1) / 2)
-    return joystick.get_axis(0)/3, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
+
+    def non_linear_steering(x):
+        return x * (1 - abs(x) ** 2)  
+
+    steering = joystick.get_axis(0)
+    throttle = joystick.get_axis(1)
+    brake = joystick.get_axis(2)
+    adjusted_steering = non_linear_steering(steering)
+    adjusted_throttle = (-throttle + 1) / 2
+    adjusted_brake = (-brake + 1) / 2
+
+    return adjusted_steering, adjusted_throttle, adjusted_brake
 
 
-def destroy_lose_vehicle(main_car):  # 销毁失控车辆
+def destroy_lose_vehicle(main_car):  
     global vices_car_list
 
     def destroy():
@@ -923,7 +930,7 @@ def scene_jian(vehicle, main_car_control, vice_car_control, end_location):  # �
 
     scene_status = "等待36s开始"  # 36s
     t = time.time()
-    time_gap = 3
+    time_gap = 36
     while time.time() - t < time_gap:
         scene_status = f"倒计时{int(time_gap - (time.time() - t))}s (简单场景)"
         # print(f"经历了{int(time.time() - t)}s了")
