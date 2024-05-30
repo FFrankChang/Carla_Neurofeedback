@@ -1,5 +1,5 @@
-from vehicle_method import *
-from config import *
+from .vehicle_method import *
+from .config import *
 
 
 def brake_throttle_retard(vehicle, acceleration, target_speed, direction=True):
