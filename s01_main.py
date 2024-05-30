@@ -29,6 +29,7 @@ class DataRecorder:
         self.interval = 1.0 / frequency
         self.collision_detected = False
         self.mode_switched = False
+        self.is_file_closed = False
 
     def record_collision(self):
         self.collision_detected = True
@@ -37,26 +38,32 @@ class DataRecorder:
         self.mode_switched = True
 
     def record_data(self, timestamp, speed, location, steer, acceleration, gyro, compass, lead_vehicle_speed, lead_vehicle_location):
-        current_time = time.time()
-        if current_time - self.last_record_time >= self.interval:
-            collision_status = 'Yes' if self.collision_detected else 'No'
-            mode_switched_status = 'Yes' if self.mode_switched else ''
-            self.writer.writerow([
-                timestamp, speed, location.x, location.y, location.z, steer,
-                acceleration.x, acceleration.y, acceleration.z, gyro.x, gyro.y, gyro.z,
-                compass, lead_vehicle_speed,
-                lead_vehicle_location.x if lead_vehicle_location else None,
-                lead_vehicle_location.y if lead_vehicle_location else None,
-                lead_vehicle_location.z if lead_vehicle_location else None,
-                collision_status, mode_switched_status
-            ])
-            self.last_record_time = current_time
-            self.collision_detected = False  
-            self.mode_switched = False  
-            self.file.flush()
+        if not self.is_file_closed:
+            current_time = time.time()
+            if current_time - self.last_record_time >= self.interval:
+                collision_status = 'Yes' if self.collision_detected else 'No'
+                mode_switched_status = 'Yes' if self.mode_switched else ''
+                self.writer.writerow([
+                    timestamp, speed, location.x, location.y, location.z, steer,
+                    acceleration.x, acceleration.y, acceleration.z, gyro.x, gyro.y, gyro.z,
+                    compass, lead_vehicle_speed,
+                    lead_vehicle_location.x if lead_vehicle_location else None,
+                    lead_vehicle_location.y if lead_vehicle_location else None,
+                    lead_vehicle_location.z if lead_vehicle_location else None,
+                    collision_status, mode_switched_status
+                ])
+                self.last_record_time = current_time
+                self.collision_detected = False  
+                self.mode_switched = False  
+                self.file.flush()
+        else:
+            print("Attempt to write to a closed file ignored.")
 
     def close(self):
+        self.file.flush()
+        self.is_file_closed = True
         self.file.close()
+        print("Data file has been closed safely.")
 
 class Vehicle_Traffic:
     def __init__(self, world):
@@ -201,6 +208,9 @@ class Main_Car_Control:
             lead_vehicle_location
         )
 
+    def cleanup(self):
+        """Cleanup method to call when application is closing."""
+        self.imu_sensor.stop()
 
     def follow_road(self):
         global drive_status, scene_status, directions, volume_size
@@ -490,7 +500,7 @@ def set_brake_lights(vehicle):
 
 
 class Window:
-    def __init__(self, world, blueprint_library, vehicle):
+    def __init__(self, world, blueprint_library, vehicle, data_recorder,main_car_control):
         """
         创建车子的pygame窗口显示
         :param world: 世界对象
@@ -501,7 +511,8 @@ class Window:
         self.vehicle = vehicle
         # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
         self.collision_detected = False  # 添加此行来追踪碰撞状态
-
+        self.data_recorder = data_recorder
+        self.main_car_control = main_car_control
         self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
         self.fonts = {} 
@@ -533,6 +544,7 @@ class Window:
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:  # 窗口关闭
+                    self.handle_quit()
                     pygame.quit()
                     os._exit(0)
                 elif event.type == VIDEORESIZE:
@@ -584,6 +596,16 @@ class Window:
         text_rect.topleft = position
         self.screen.blit(text, text_rect)
 
+    def handle_quit(self):
+        self.main_car_control.cleanup()
+        self.data_recorder.close()
+        response = input("Mark data as invalid? Enter 1 for Yes, 0 for No: ")
+        if response.strip() == '1':
+            new_filename = self.data_recorder.filename.replace('.csv', '_invalid.csv')
+            os.rename(self.data_recorder.filename, new_filename)
+            print(f"Data file has been renamed to: {new_filename}")
+        else:
+            print("Data file has been marked as valid.")
 
 def smooth_steer(steer_input):
     global last_steer
@@ -1035,68 +1057,68 @@ if __name__ == '__main__':
     ]
     physics_control.steering_curve = steering_curve
     vehicle.apply_physics_control(physics_control)
-
-    destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
-    window = Window(world, blueprint_library, vehicle)  # 创建窗口
-    collision_sensor = attach_collision_sensor(vehicle, world, window, data_recorder)
     main_car_control = Main_Car_Control(vehicle,world,data_recorder, True)  # 主车控制类
     vice_car_control = Vice_Control(vehicle)  # 副车控制类
+    destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
+    window = Window(world, blueprint_library, vehicle, data_recorder,main_car_control)  # 创建窗口
+    collision_sensor = attach_collision_sensor(vehicle, world, window, data_recorder)
+
 
     # 简单场景一
     scene_jian(vehicle, main_car_control, vice_car_control, interfere_one_location1)
-    # 干扰场景一
-    scene_gan(vehicle, main_car_control, vice_car_control, interfere_two_location1)
+    # # 干扰场景一
+    # scene_gan(vehicle, main_car_control, vice_car_control, interfere_two_location1)
 
-    # 干扰场景二
-    scene_gan2(vehicle, main_car_control, vice_car_control, easy_location2)
+    # # 干扰场景二
+    # scene_gan2(vehicle, main_car_control, vice_car_control, easy_location2)
 
-    # 简单场景二
-    scene_jian(vehicle, main_car_control, vice_car_control, interfere_one_location2)
+    # # 简单场景二
+    # scene_jian(vehicle, main_car_control, vice_car_control, interfere_one_location2)
 
-    # 干扰场景一
-    scene_gan(vehicle, main_car_control, vice_car_control, end_location1)
+    # # 干扰场景一
+    # scene_gan(vehicle, main_car_control, vice_car_control, end_location1)
 
-    # 过渡
-    interim(vehicle, main_car_control, easy_location3)
+    # # 过渡
+    # interim(vehicle, main_car_control, easy_location3)
 
-    # 简单场景三
-    scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location2)
+    # # 简单场景三
+    # scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location2)
 
-    # 干扰场景二
-    scene_gan2(vehicle, main_car_control, vice_car_control, end_location2)
+    # # 干扰场景二
+    # scene_gan2(vehicle, main_car_control, vice_car_control, end_location2)
 
-    # 过渡
-    interim(vehicle, main_car_control, easy_location4)
+    # # 过渡
+    # interim(vehicle, main_car_control, easy_location4)
 
-    # 简单场景四
-    scene_jian(vehicle, main_car_control, vice_car_control, easy_location5)
+    # # 简单场景四
+    # scene_jian(vehicle, main_car_control, vice_car_control, easy_location5)
 
-    # 简单场景五
-    scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location3)
+    # # 简单场景五
+    # scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location3)
 
-    # 干扰场景二
-    scene_gan2(vehicle, main_car_control, vice_car_control, easy_location6)
+    # # 干扰场景二
+    # scene_gan2(vehicle, main_car_control, vice_car_control, easy_location6)
 
-    # 简单场景六
-    scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location4)
+    # # 简单场景六
+    # scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location4)
 
-    # 干扰场景二
-    scene_gan2(vehicle, main_car_control, vice_car_control, interfere_one_location3)
+    # # 干扰场景二
+    # scene_gan2(vehicle, main_car_control, vice_car_control, interfere_one_location3)
 
-    # 干扰场景一
-    scene_gan(vehicle, main_car_control, vice_car_control, end_location3)
+    # # 干扰场景一
+    # scene_gan(vehicle, main_car_control, vice_car_control, end_location3)
 
-    # 过渡
-    interim(vehicle, main_car_control, easy_location7)
+    # # 过渡
+    # interim(vehicle, main_car_control, easy_location7)
 
-    # 简单场景七
-    scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location5)
+    # # 简单场景七
+    # scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location5)
 
-    # 干扰场景二
-    scene_gan2(vehicle, main_car_control, vice_car_control, end_location4)
+    # # 干扰场景二
+    # scene_gan2(vehicle, main_car_control, vice_car_control, end_location4)
 
-    # 简单场景八
-    scene_jian(vehicle, main_car_control, vice_car_control, easy_location8)
+    # # 简单场景八
+    # scene_jian(vehicle, main_car_control, vice_car_control, easy_location8)
 
     # 简单场景
     while True:
