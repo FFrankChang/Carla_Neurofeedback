@@ -1026,17 +1026,17 @@ if __name__ == '__main__':
     vehicle_traffic = Vehicle_Traffic(world)  # 车辆创建对象
     vehicle = vehicle_traffic.create_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]  # 创建主车
 
-    # physics_control = vehicle.get_physics_control() # 修改车辆控制参数
-    #
-    # # steering_curve = [
-    # #     carla.Vector2D(x=0.0, y=1.0),
-    # #     carla.Vector2D(x=20.0, y=0.8),
-    # #     carla.Vector2D(x=80.0, y=0.3),
-    # #     carla.Vector2D(x=120.0, y=0.1)
-    # # ]
-    #
-    # physics_control.steering_curve = steering_curve
-    # vehicle.apply_physics_control(physics_control)
+    physics_control = vehicle.get_physics_control() # 修改车辆控制参数
+
+    steering_curve = [
+        carla.Vector2D(x=0.0, y=1.0),
+        carla.Vector2D(x=20.0, y=0.8),
+        carla.Vector2D(x=80.0, y=0.3),
+        carla.Vector2D(x=120.0, y=0.1)
+    ]
+
+    physics_control.steering_curve = steering_curve
+    vehicle.apply_physics_control(physics_control)
 
     destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
     window = Window(world, blueprint_library, vehicle)  # 创建窗口
