@@ -587,7 +587,7 @@ class Window:
 
 def smooth_steer(steer_input):
     global last_steer
-    alpha = 0.8  # 平滑系数，调整此值以改变平滑程度
+    alpha = 0.9  # 平滑系数，调整此值以改变平滑程度
     smoothed_steer = alpha * steer_input + (1 - alpha) * last_steer
     last_steer = smoothed_steer
     return smoothed_steer
@@ -867,7 +867,7 @@ def set_speed(vehicle, speed_kmh):
 def get_steering_wheel_info_modified():
 
     def non_linear_steering(x):
-        p = 2
+        p = 1.5
         return np.sign(x) * np.abs(x)**p
     
     steering = joystick.get_axis(0)
@@ -1029,9 +1029,9 @@ if __name__ == '__main__':
     physics_control = vehicle.get_physics_control() # 修改车辆控制参数
     steering_curve = [
         carla.Vector2D(x=0.0, y=1.0),
-        carla.Vector2D(x=20.0, y=0.8),
-        carla.Vector2D(x=80.0, y=0.3),
-        carla.Vector2D(x=120.0, y=0.1)
+        carla.Vector2D(x=20.0, y=0.9),
+        carla.Vector2D(x=80.0, y=0.8),
+        carla.Vector2D(x=120.0, y=0.2)
     ]
     physics_control.steering_curve = steering_curve
     vehicle.apply_physics_control(physics_control)
