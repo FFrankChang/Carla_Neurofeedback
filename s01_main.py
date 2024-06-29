@@ -517,8 +517,8 @@ class Window:
         self.blueprint_camera = blueprint_library.find('sensor.camera.rgb')  # 选择一个传感器蓝图
         self.blueprint_camera.set_attribute('image_size_x', f'{self.SCREEN_WIDTH}')  # 传感器获得的图片高度
         self.blueprint_camera.set_attribute('image_size_y', f'{self.SCREEN_HEIGHT}')  # 传感器获得的图片宽度
-        self.blueprint_camera.set_attribute('fov', '145')  # 水平方向上能看到的视角度数
-        spawn_point = carla.Transform(carla.Location(x=0.15, y = -0.21, z=1.15), carla.Rotation(pitch=7, yaw=0, roll=0))  # 传感器相对车子的位置设置
+        self.blueprint_camera.set_attribute('fov', '150')  # 水平方向上能看到的视角度数
+        spawn_point = carla.Transform(carla.Location(x=0.2, y = -0.21, z=1.2), carla.Rotation(pitch=7, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = self.world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
 
         threading.Thread(target=self.show_screen).start()
@@ -863,14 +863,36 @@ def set_speed(vehicle, speed_kmh):
         carla.Vector3D(forward_vector.x * speed, forward_vector.y * speed, forward_vector.z * speed))
 
 
+remember_1f = 0
+remember_2f = 0
+remember_3f = 0
+
+
+
 # 获取方向盘信息
 def get_steering_wheel_info_modified():
+    global remember_1f,remember_2f
+    # 当前最新方向盘信息
+    steering = joystick.get_axis(0)
+
+    # 趋势查看
+    d1 = remember_2f - remember_3f
+    d2 = remember_1f - remember_2f
+    d3 = steering - remember_1f
+
+    if d1 > 0 and d2 > 0 and d3 <0:
+        steering2 = steering * 1.5
+    
 
     def non_linear_steering(x):
         p = 2
         return np.sign(x) * np.abs(x)**p
-    
-    steering = joystick.get_axis(0)
+
+
+
+
+    # print(steering)
+
     throttle = joystick.get_axis(1)
     brake = joystick.get_axis(2)
     adjusted_steering = steering
@@ -1031,7 +1053,7 @@ if __name__ == '__main__':
     steering_curve = [
         carla.Vector2D(x=0.0, y=1.0),
         carla.Vector2D(x=20.0, y=0.8),
-        carla.Vector2D(x=80.0, y=0.3),
+        carla.Vector2D(x=80.0, y=0.38),
         carla.Vector2D(x=120.0, y=0.1)
     ]
 

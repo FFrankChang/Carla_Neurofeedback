@@ -15,6 +15,8 @@ var wheel = {
     moved: true
 }
 
+// const diff_force
+
 const turn_wheel = (set_point) => {
     if (connected) {
         connected = false
@@ -23,6 +25,7 @@ const turn_wheel = (set_point) => {
                 console.log('Oops -> ' + err)
             }
             g.forceFriction(0.5) // 方向盘摩擦力
+
             g.on('wheel-turn', function (val) {
                 wheel.currentPos = val;
             })
