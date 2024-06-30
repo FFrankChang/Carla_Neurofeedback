@@ -4,7 +4,7 @@ import socket
 import carla
 import pygame
 from disposition import *
-from config import *
+from s01_config import *
 import random
 
 
