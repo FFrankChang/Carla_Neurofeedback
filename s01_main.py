@@ -501,6 +501,7 @@ class Window:
         self.vehicle = vehicle
         self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
         self.collision_detected = False  # 添加此行来追踪碰撞状态
+        self.changelane_detected = False
 
         # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
@@ -566,6 +567,9 @@ class Window:
         if self.collision_detected:
             self.draw_text("Collision!", 160, (self.SCREEN_WIDTH // 2-200, self.SCREEN_HEIGHT // 2), bold=True,color=(255, 0, 0))
             self.collision_detected = False  # 重置碰撞状态
+        if self.changelane_detected:
+            self.draw_text("ChangeLane!", 160, (self.SCREEN_WIDTH // 2-200, self.SCREEN_HEIGHT // 2), bold=True,color=(255, 0, 0))
+            self.changelane_detected = False  # 重置碰撞状态
         # 刷新屏幕
         pygame.display.flip()
 
@@ -863,15 +867,30 @@ def set_speed(vehicle, speed_kmh):
         carla.Vector3D(forward_vector.x * speed, forward_vector.y * speed, forward_vector.z * speed))
 
 
+import time
+
 remember_1f = 0
 remember_2f = 0
 remember_3f = 0
+trend_change_time = 0
+trend_change_duration = 0.5  # 持续时间秒
+ela_index = 1.5  # 放大系数
+threshold = 0.0005  # 趋势变化的阈值
+steering_threshold = 0.05  # 方向盘转角的阈值
 
+
+def sign(x):
+    if x > 0:
+        return 1
+    elif x < 0:
+        return -1
+    else:
+        return 0
 
 
 # 获取方向盘信息
 def get_steering_wheel_info_modified():
-    global remember_1f,remember_2f
+    global remember_1f, remember_2f, remember_3f, trend_change_time
     # 当前最新方向盘信息
     steering = joystick.get_axis(0)
 
@@ -880,26 +899,40 @@ def get_steering_wheel_info_modified():
     d2 = remember_1f - remember_2f
     d3 = steering - remember_1f
 
-    if d1 > 0 and d2 > 0 and d3 <0:
-        steering2 = steering * 1.5
-    
+    current_time = time.time()
 
-    def non_linear_steering(x):
-        p = 2
-        return np.sign(x) * np.abs(x)**p
+    # 检查趋势变化并满足阈值条件
+    if (abs(remember_1f) > steering_threshold) and \
+            ((d1 >= 0 and d2 >= 0 and d3 < -threshold) or (
+                    d1 <= 0 and d2 <= 0 and d3 > threshold)):
+        trend_change_time = current_time  # 记录趋势变化时间
+        # window.changelane_detected = True  # 设置窗口类中的碰撞标志
+    else:
+        # print(d1,d2,d3,steering)
+        pass
 
+    # 判断是否在趋势变化的2秒内
+    if current_time - trend_change_time < trend_change_duration:
+        steering2 = steering * ela_index
+    else:
+        steering2 = steering
 
+    if steering2 > 1 or steering2 < -1:
+        steering2 = sign(steering2)
 
-
-    # print(steering)
+    # 记忆更新
+    remember_3f = remember_2f
+    remember_2f = remember_1f
+    remember_1f = steering
 
     throttle = joystick.get_axis(1)
     brake = joystick.get_axis(2)
-    adjusted_steering = steering
+    adjusted_steering = steering2
     adjusted_throttle = (-throttle + 1) / 2
     adjusted_brake = (-brake + 1) / 2
 
     return adjusted_steering, adjusted_throttle, adjusted_brake
+
 
 def get_steering_wheel_info():
     steering = joystick.get_axis(0)
