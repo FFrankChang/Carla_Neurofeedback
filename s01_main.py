@@ -874,9 +874,9 @@ remember_2f = 0
 remember_3f = 0
 trend_change_time = 0
 trend_change_duration = 0.5  # 持续时间秒
-ela_index = 1.5  # 放大系数
-threshold = 0.0005  # 趋势变化的阈值
-steering_threshold = 0.05  # 方向盘转角的阈值
+ela_index = 2  # 放大系数
+threshold = 0.0007  # 趋势变化的阈值
+steering_threshold = 0.03  # 方向盘转角的阈值
 
 
 def sign(x):
@@ -906,7 +906,7 @@ def get_steering_wheel_info_modified():
             ((d1 >= 0 and d2 >= 0 and d3 < -threshold) or (
                     d1 <= 0 and d2 <= 0 and d3 > threshold)):
         trend_change_time = current_time  # 记录趋势变化时间
-        # window.changelane_detected = True  # 设置窗口类中的碰撞标志
+        window.changelane_detected = True  # 设置窗口类中的碰撞标志
     else:
         # print(d1,d2,d3,steering)
         pass
@@ -915,7 +915,7 @@ def get_steering_wheel_info_modified():
     if current_time - trend_change_time < trend_change_duration:
         steering2 = steering * ela_index
     else:
-        steering2 = steering
+        steering2 = steering * 0.8
 
     if steering2 > 1 or steering2 < -1:
         steering2 = sign(steering2)
