@@ -207,7 +207,7 @@ class Window:
         :param vehicle: 车子对象
         """
         self.vehicle = vehicle
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1600, 1000  # 屏幕大小
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5460, 1000  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
         pygame.init()  # 初始化pygame
 
@@ -222,7 +222,7 @@ class Window:
         self.blueprint_camera.set_attribute('image_size_x', f'{self.SCREEN_WIDTH}')  # 传感器获得的图片高度
         self.blueprint_camera.set_attribute('image_size_y', f'{self.SCREEN_HEIGHT}')  # 传感器获得的图片宽度
         self.blueprint_camera.set_attribute('fov', '110')  # 水平方向上能看到的视角度数
-        spawn_point = carla.Transform(carla.Location(x=-0.15, y=-0.21, z=1.15),
+        spawn_point = carla.Transform(carla.Location(x=-0.1, y=-0.21, z=1.21),
                                       carla.Rotation(pitch=7, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
 
@@ -573,12 +573,82 @@ def draw_arrow(locations, distance=10, height=1):
         debug.draw_arrow(arrow_location, target_location, thickness=0.3, arrow_size=0.5, color=carla.Color(255, 0, 0))
 
 
+# def get_steering_wheel_info():
+#     """
+#     return: 方向盘、油门、刹车
+#     """
+#     # 这里0,2,3根据实际情况的方向盘参数
+#     return joystick.get_axis(0), (-joystick.get_axis(2) + 1) / 2, (-joystick.get_axis(3) + 1) / 2
+
+
+import time
+
+remember_1f = 0
+remember_2f = 0
+remember_3f = 0
+trend_change_time = 0
+trend_change_duration = 0.5  # 持续时间秒
+ela_index = 2  # 放大系数
+threshold = 0.0007  # 趋势变化的阈值
+steering_threshold = 0.03  # 方向盘转角的阈值
+
+
+def sign(x):
+    if x > 0:
+        return 1
+    elif x < 0:
+        return -1
+    else:
+        return 0
+#
+#
+# 获取方向盘信息
 def get_steering_wheel_info():
-    """
-    return: 方向盘、油门、刹车
-    """
-    # 这里0,2,3根据实际情况的方向盘参数
-    return joystick.get_axis(0), (-joystick.get_axis(2) + 1) / 2, (-joystick.get_axis(3) + 1) / 2
+    global remember_1f, remember_2f, remember_3f, trend_change_time
+    # 当前最新方向盘信息
+    steering = joystick.get_axis(0)
+
+    # 趋势查看
+    d1 = remember_2f - remember_3f
+    d2 = remember_1f - remember_2f
+    d3 = steering - remember_1f
+
+    current_time = time.time()
+
+    # 检查趋势变化并满足阈值条件
+    if (abs(remember_1f) > steering_threshold) and \
+            ((d1 >= 0 and d2 >= 0 and d3 < -threshold) or (
+                    d1 <= 0 and d2 <= 0 and d3 > threshold)):
+        trend_change_time = current_time  # 记录趋势变化时间
+        # window.changelane_detected = True  # 设置窗口类中的碰撞标志
+    else:
+        # print(d1,d2,d3,steering)
+        pass
+
+    # 判断是否在趋势变化的2秒内
+    if current_time - trend_change_time < trend_change_duration:
+        steering2 = steering * ela_index
+    else:
+        steering2 = steering
+
+    if steering2 > 1 or steering2 < -1:
+        steering2 = sign(steering2)
+
+    # 记忆更新
+    remember_3f = remember_2f
+    remember_2f = remember_1f
+    remember_1f = steering
+
+    throttle = joystick.get_axis(1)
+    brake = joystick.get_axis(2)
+    adjusted_steering = steering2
+    adjusted_throttle = (-throttle + 1) / 2
+    adjusted_brake = (-brake + 1) / 2
+
+    return adjusted_steering, adjusted_throttle, adjusted_brake
+
+
+
 
 
 def destroy_all_vehicles_traffics(vehicles=None, vehicle_flag=True, traffic_flag=True, people_flag=True):

@@ -141,7 +141,7 @@ if __name__ == '__main__':
     # vehicle_control.autopilot_flag=False
     vehicle_control.autopilot_speed_limit = 30
     vehicle_control.labour_speed_limit = 30
-    vehicle_control.labour_low_speed_limit = 15
+    vehicle_control.labour_low_speed_limit = 30
     vehicle_control.follow_lane()
 
     for i in range(5):
