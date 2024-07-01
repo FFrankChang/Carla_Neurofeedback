@@ -22,7 +22,7 @@ const turn_wheel = (set_point) => {
             if (err) {
                 console.log('Oops -> ' + err)
             }
-            g.forceFriction(0.5) // 方向盘摩擦力
+            g.forceFriction(0.1) // 方向盘摩擦力
             g.on('wheel-turn', function (val) {
                 wheel.currentPos = val;
             })
