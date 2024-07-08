@@ -47,13 +47,12 @@ class Vehicle_Control:
                     if get_speed(self.vehicle) > self.labour_speed_limit:  # 设置最高速度
                         throttle = 0.2
                     elif get_speed(self.vehicle) < self.labour_low_speed_limit:
-                        print("走了")
-                        throttle = 1  # 最第速度
+                        throttle = 1  
                     if throttle==0.5:
                         throttle=0
                     if brake==0.5:
                         brake=0
-                    print(round(steer, 3), round(throttle, 3), round(brake, 3))
+                    # print(round(steer, 3), round(throttle, 3), round(brake, 3))
                     result = carla.VehicleControl(steer=round(steer, 1), throttle=round(throttle, 1),
                                                   brake=round(brake, 1))
                     self.vehicle.apply_control(result)
@@ -207,7 +206,7 @@ class Window:
         :param vehicle: 车子对象
         """
         self.vehicle = vehicle
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5460, 1000  # 屏幕大小
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
         pygame.init()  # 初始化pygame
 
