@@ -24,14 +24,17 @@ class DataRecorder:
         self.filename = filename
         self.file = open(self.filename, 'w', newline='')
         self.writer = csv.writer(self.file)
-        self.writer.writerow(['timestamp', 'Speed', 'Location_x', 'Location_y', 'Location_z', 'Steer', 'Acceleration_x', 'Acceleration_y', 'Acceleration_z', 'Gyro_x', 'Gyro_y', 'Gyro_z', 'Compass', 'Lead_Vehicle_Speed', 'Lead_Vehicle_X', 'Lead_Vehicle_Y', 'Lead_Vehicle_Z', 'Collision', 'Mode_Switched'])
+        self.writer.writerow(['timestamp', 'Speed', 'Location_x', 'Location_y', 'Location_z', 'Steer', 'Acceleration_x', 'Acceleration_y', 'Acceleration_z', 'Gyro_x', 'Gyro_y', 'Gyro_z', 'Compass', 'Lead_Vehicle_Speed', 'Lead_Vehicle_X', 'Lead_Vehicle_Y', 'Lead_Vehicle_Z', 'Collision', 'TOR','Mode_Switched'])
         self.last_record_time = time.time()
         self.interval = 1.0 / frequency
         self.collision_detected = False
         self.mode_switched = False
-
+        self.tor = False
     def record_collision(self):
         self.collision_detected = True
+
+    def record_tor(self):
+        self.tor = True
 
     def record_mode_switch(self):
         self.mode_switched = True
@@ -41,6 +44,7 @@ class DataRecorder:
         if current_time - self.last_record_time >= self.interval:
             collision_status = 'Yes' if self.collision_detected else 'No'
             mode_switched_status = 'Yes' if self.mode_switched else ''
+            tor_status = 'Yes' if self.tor else ''
             self.writer.writerow([
                 timestamp, speed, location.x, location.y, location.z, steer,
                 acceleration.x, acceleration.y, acceleration.z, gyro.x, gyro.y, gyro.z,
@@ -48,11 +52,12 @@ class DataRecorder:
                 lead_vehicle_location.x if lead_vehicle_location else None,
                 lead_vehicle_location.y if lead_vehicle_location else None,
                 lead_vehicle_location.z if lead_vehicle_location else None,
-                collision_status, mode_switched_status
+                collision_status, tor_status,mode_switched_status
             ])
             self.last_record_time = current_time
             self.collision_detected = False  
             self.mode_switched = False  
+            self.tor = False  
             self.file.flush()
 
     def close(self):
@@ -248,6 +253,7 @@ class Main_Car_Control:
                         if  not takeover_prompted:  # 检查是否已经提示过接管
                             print("请接管！！！！！！！！！！！！")
                             message = "tor"
+                            self.data_recorder.record_tor()
                             self.sock.sendto(message.encode(), (self.udp_ip, self.udp_port))
                             takeover_prompted = True
                 # 获取前方道路
