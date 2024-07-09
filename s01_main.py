@@ -87,7 +87,7 @@ class Vehicle_Traffic:
             cars = [bp for bp in blueprint_car if vehicle_model in bp.id.lower()]
         else:
             # 获取车辆的蓝图
-            blueprint_car = self.blueprint_library.filter('*vehicle*')
+            blueprint_car = self.blueprint_library.filter('*crown*')
             cars = [
                 x for x in blueprint_car 
                 if int(x.get_attribute('number_of_wheels')) == 4 
@@ -156,7 +156,7 @@ class Main_Car_Control:
         self.road_id = 4  # 主车所在道路id
         self.speed_limit = 100  # 主车速度限制
         self.flag = True
-        self.udp_ip = "192.168.3.9"  # IP of the destination computer
+        self.udp_ip = "127.0.0.1"  # IP of the destination computer
         self.udp_port = 12346  # Port number on the destination computer
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP socket
 
@@ -274,10 +274,10 @@ class Main_Car_Control:
 
                 # if get_speed(self.vehicle) > self.speed_limit:  # 设置最高速度
                 #     throttle = 0.5
-                if get_speed(self.vehicle) < 80:  # 设置最低速度
-                   set_speed(self.vehicle,80)
+                # if get_speed(self.vehicle) < 80:  # 设置最低速度
+                #    set_speed(self.vehicle,80)
                 car_control(vehicle, steer, throttle, brake)
-                sleep(0.001)
+                sleep(0.002)
 
     def stop_vehicle(self):
         self.data_recorder.close()
@@ -327,7 +327,7 @@ class Vice_Control:
                                 vices_car_list = [car for car in vices_car_list if car.id != next_car.id]
                             if next_car:
                                 self.thread_cut_speed = threading.Thread(target=self.brake_throttle_retard,
-                                                                        args=(next_car, -8.5, 0, 3, i == 0))
+                                                                        args=(next_car, -8.5, 0, 0, i == 0))
                                 self.thread_cut_speed.start()
                                 
             pid = VehiclePIDController(car, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
@@ -499,10 +499,10 @@ class Window:
         """
         self.world = world
         self.vehicle = vehicle
-        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
         self.collision_detected = False  # 添加此行来追踪碰撞状态
 
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
+        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
         self.fonts = {} 
         pygame.init()  # 初始化pygame
@@ -938,7 +938,7 @@ def scene_jian(vehicle, main_car_control, vice_car_control, end_location):  # �
 
     scene_status = "等待36s开始"  # 36s
     t = time.time()
-    time_gap = 3
+    time_gap = 36
     while time.time() - t < time_gap:
         scene_status = f"倒计时{int(time_gap - (time.time() - t))}s (简单场景)"
         # print(f"经历了{int(time.time() - t)}s了")
@@ -1044,59 +1044,6 @@ if __name__ == '__main__':
 
     # 简单场景一
     scene_jian(vehicle, main_car_control, vice_car_control, interfere_one_location1)
-    # 干扰场景一
-    scene_gan(vehicle, main_car_control, vice_car_control, interfere_two_location1)
-
-    # 干扰场景二
-    scene_gan2(vehicle, main_car_control, vice_car_control, easy_location2)
-
-    # 简单场景二
-    scene_jian(vehicle, main_car_control, vice_car_control, interfere_one_location2)
-
-    # 干扰场景一
-    scene_gan(vehicle, main_car_control, vice_car_control, end_location1)
-
-    # 过渡
-    interim(vehicle, main_car_control, easy_location3)
-
-    # 简单场景三
-    scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location2)
-
-    # 干扰场景二
-    scene_gan2(vehicle, main_car_control, vice_car_control, end_location2)
-
-    # 过渡
-    interim(vehicle, main_car_control, easy_location4)
-
-    # 简单场景四
-    scene_jian(vehicle, main_car_control, vice_car_control, easy_location5)
-
-    # 简单场景五
-    scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location3)
-
-    # 干扰场景二
-    scene_gan2(vehicle, main_car_control, vice_car_control, easy_location6)
-
-    # 简单场景六
-    scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location4)
-
-    # 干扰场景二
-    scene_gan2(vehicle, main_car_control, vice_car_control, interfere_one_location3)
-
-    # 干扰场景一
-    scene_gan(vehicle, main_car_control, vice_car_control, end_location3)
-
-    # 过渡
-    interim(vehicle, main_car_control, easy_location7)
-
-    # 简单场景七
-    scene_jian(vehicle, main_car_control, vice_car_control, interfere_two_location5)
-
-    # 干扰场景二
-    scene_gan2(vehicle, main_car_control, vice_car_control, end_location4)
-
-    # 简单场景八
-    scene_jian(vehicle, main_car_control, vice_car_control, easy_location8)
 
     # 简单场景
     while True:

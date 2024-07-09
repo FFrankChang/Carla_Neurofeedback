@@ -578,7 +578,7 @@ def get_steering_wheel_info():
     return: 方向盘、油门、刹车
     """
     # 这里0,2,3根据实际情况的方向盘参数
-    return joystick.get_axis(0), (-joystick.get_axis(2) + 1) / 2, (-joystick.get_axis(3) + 1) / 2
+    return joystick.get_axis(0), (-joystick.get_axis(1) + 1) / 2, (-joystick.get_axis(2) + 1) / 2
 
 
 def destroy_all_vehicles_traffics(vehicles=None, vehicle_flag=True, traffic_flag=True, people_flag=True):
