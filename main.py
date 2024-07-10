@@ -132,7 +132,7 @@ def check_vehicle_destroy(vehicle, vices, location):
 
 if __name__ == '__main__':
     destroy_all_vehicles_traffics()
-    vehicle = create_actor(main_car_location)  # 创建主车
+    vehicle = create_actor(main_car_location, model="vehicle.lincoln.mkz_2020")  # 创建主车
     vehicle_control = Vehicle_Control(vehicle)  # 主车控制类
 
     Window(vehicle)  # 窗口

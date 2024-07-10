@@ -52,7 +52,7 @@ class Vehicle_Control:
                                                   brake=round(brake, 3))
                     self.vehicle.apply_control(result)
                 sleep(0.01)
-
+ 
         threading.Thread(target=control).start()
 
     def right_left_lane(self, direction=None, min_direction=10, method="pid", line_number=1, draw=False):
@@ -201,7 +201,8 @@ class Window:
         :param vehicle: 车子对象
         """
         self.vehicle = vehicle
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1600, 1000  # 屏幕大小
+        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
         pygame.init()  # 初始化pygame
 
@@ -216,8 +217,7 @@ class Window:
         self.blueprint_camera.set_attribute('image_size_x', f'{self.SCREEN_WIDTH}')  # 传感器获得的图片高度
         self.blueprint_camera.set_attribute('image_size_y', f'{self.SCREEN_HEIGHT}')  # 传感器获得的图片宽度
         self.blueprint_camera.set_attribute('fov', '110')  # 水平方向上能看到的视角度数
-        spawn_point = carla.Transform(carla.Location(x=-5, y=0, z=3),
-                                      carla.Rotation(pitch=0, yaw=0, roll=0))  # 传感器相对车子的位置设置
+        spawn_point = carla.Transform(carla.Location(x=-0.1, y=-0.21, z=1.2), carla.Rotation(pitch=0, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
 
         threading.Thread(target=self.show_screen).start()
