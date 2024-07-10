@@ -2,6 +2,7 @@ import time
 
 from s02_vehicle_method import *
 from s02_config import *
+import socket
 
 
 def brake_throttle_retard(vehicle, acceleration, target_speed, direction=True):
@@ -134,7 +135,7 @@ if __name__ == '__main__':
     destroy_all_vehicles_traffics()
     vehicle = create_actor(main_car_location, model="vehicle.lincoln.mkz_2020")  # 创建主车
     vehicle_control = Vehicle_Control(vehicle)  # 主车控制类
-
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     Window(vehicle)  # 窗口
 
     # 主车设置
@@ -159,6 +160,8 @@ if __name__ == '__main__':
         while vehicle.get_location().distance(main_car_location) < 300:
             sleep(0.01)
         print("请接管")
+        message = 'tor'
+        sock.sendto(message.encode(), ('127.0.0.1', 12346)) 
         # 场景一静1
         static_vice_car += [static_car1]  # 添加静止车辆列表
         # 弯道处车
