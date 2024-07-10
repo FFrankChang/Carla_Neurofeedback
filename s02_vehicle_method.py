@@ -1,5 +1,6 @@
 from disposition import *
-
+import time
+import socket
 
 class Vehicle_Control:
     def __init__(self, vehicle):
@@ -11,53 +12,65 @@ class Vehicle_Control:
         self.labour_low_speed_limit = 0  # 人工驾驶最低速度
         self.driver_status = "自动驾驶"
         self.instantaneous_speed = True
+        self.udp_ip = "127.0.0.1"  # IP of the destination computer
+        self.udp_port = 12346  # Port number on the destination computer
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP socket
 
     def follow_lane(self):
         pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
-
+        
         def control():
-            while True:
-                if self.lose_control:  # 判断有没有失去控制
-                    self.driver_status = "没有控制"
-                    pass
-                elif self.autopilot_flag:
-                    self.driver_status = "自动驾驶"
-                    self.autopilot_flag = not keyboard.is_pressed("q")
-                    # 自动驾驶车辆，瞬时速度
-                    if self.instantaneous_speed:
-                        if get_speed(self.vehicle) < self.autopilot_speed_limit:
-                            set_speed(self.vehicle, self.autopilot_speed_limit)
+            with open(f's02_{time.time()}.csv', 'a') as file:  # 打开文件准备写入
+                while True:
+                    if self.lose_control:  # 判断有没有失去控制
+                        self.driver_status = "没有控制"
+                        pass
+                    elif self.autopilot_flag:
+                        self.driver_status = "自动驾驶"
+                        for event in pygame.event.get():
+                            if event.type == pygame.JOYBUTTONDOWN:
+                                if event.button == 4 or event.button == 5:
+                                    message = "play"
+                                    self.sock.sendto(message.encode(), (self.udp_ip, self.udp_port)) 
+                                    print('feedback')
+                                    self.autopilot_flag = False
+                        waypoint = env_map.get_waypoint(self.vehicle.get_location()).next(
+                            max(1, int(get_speed(self.vehicle) / 6)))
+                        if waypoint:
+                            waypoint = waypoint[0]
+                        else:
+                            print(f"前方没有路了,当前车子坐标{self.vehicle.get_location()},车子对象为{self.vehicle}")
+                            set_speed(self.vehicle, 0)
+                            return
 
-                    waypoint = env_map.get_waypoint(self.vehicle.get_location()).next(
-                        max(1, int(get_speed(self.vehicle) / 6)))
-                    if waypoint:
-                        waypoint = waypoint[0]
+                        result = pid.run_step(self.autopilot_speed_limit, waypoint)
+                        self.vehicle.apply_control(result)
+
+                        # 记录数据
+                        data = {
+                            'time': time.time(),
+                            'location_x': self.vehicle.get_location().x,
+                            'location_y': self.vehicle.get_location().y,
+                            'steering':get_steering_wheel_info(),
+                            'speed': get_speed(self.vehicle),
+                            'acceleration': 0  # 假设已有此函数计算加速度
+                        }
+                        
+                        # 写入数据到文件
+                        file.write(f"{data['time']},{data['location_x']},{data['location_y']},{data['steering']},{data['speed']},{data['acceleration']}\n")
+                        file.flush()  
                     else:
-                        print(f"前方没有路了,当前车子坐标{self.vehicle.get_location()},车子对象为{self.vehicle}")
-                        set_speed(self.vehicle, 0)
-                        return
-
-                    result = pid.run_step(self.autopilot_speed_limit, waypoint)
-                    self.vehicle.apply_control(result)
-                else:
-                    self.driver_status = "人工驾驶"
-                    self.autopilot_flag = keyboard.is_pressed("e")
-                    # 人工控制车辆
-                    steer, throttle, brake = get_steering_wheel_info()
-                    if get_speed(self.vehicle) > self.labour_speed_limit:  # 设置最高速度
-                        throttle = 0.2
-                    elif get_speed(self.vehicle) < self.labour_low_speed_limit:
-                        print("走了")
-                        throttle = 1  # 最第速度
-                    if throttle==0.5:
-                        throttle=0
-                    if brake==0.5:
-                        brake=0
-                    print(round(steer, 3), round(throttle, 3), round(brake, 3))
-                    result = carla.VehicleControl(steer=round(steer, 1), throttle=round(throttle, 1),
-                                                  brake=round(brake, 1))
-                    self.vehicle.apply_control(result)
-                sleep(0.001)
+                        self.driver_status = "人工驾驶"
+                        self.autopilot_flag = keyboard.is_pressed("e")
+                        steer, throttle, brake = get_steering_wheel_info()
+                        if get_speed(self.vehicle) > self.labour_speed_limit:  # 设置最高速度
+                            throttle = 0.2
+                        elif get_speed(self.vehicle) < self.labour_low_speed_limit:
+                            throttle = 1
+                        result = carla.VehicleControl(steer=round(steer, 1), throttle=round(throttle, 1),
+                                                    brake=round(brake, 1))
+                        self.vehicle.apply_control(result)
+                    sleep(0.001)
 
         threading.Thread(target=control).start()
 
@@ -207,7 +220,7 @@ class Window:
         :param vehicle: 车子对象
         """
         self.vehicle = vehicle
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1600, 1000  # 屏幕大小
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
         pygame.init()  # 初始化pygame
 
