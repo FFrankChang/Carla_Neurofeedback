@@ -5,14 +5,14 @@ import csv
 import time
 
 # Setup UDP server
-UDP_IP = "127.0.0.1"  # Local IP
+UDP_IP = "0.0.0.0"  # Local IP
 UDP_PORT = 5005       # Port number
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
 
 # Create a socket for sending messages
 send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-send_ip = "127.0.0.1"
+send_ip = "0.0.0.0"
 send_port = 12347
 
 process = None
@@ -50,8 +50,10 @@ try:
             if process is None:  # Check if a process is already running
                 # Start the script with additional parameters for script 2 and 3
                 if command in ["2", "3"]:
+                    print(2)
                     process = subprocess.Popen(["python", script_path, subject, day, condition])
                 else:
+                    print(3)
                     process = subprocess.Popen(["python", script_path])
                 
                 start_time = time.time()
