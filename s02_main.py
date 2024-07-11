@@ -5,21 +5,28 @@ import threading
 import csv
 import datetime
 import sys
-
+import socket
 class DataRecorder:
-    def __init__(self, vehicle, subject, date, condition,rate=0.02):
+    def __init__(self, vehicle, subject,date,now_condition):
         self.vehicle = vehicle
         self.subject = subject
         self.date = date
-        self.condition = condition
+        self.condition = now_condition
         self.vehicle = vehicle
-        self.rate = rate  # Data recording rate in seconds
+        self.rate = 0.02  # Data recording rate in seconds
         self.running = True
-        self.filename = f"./data/carla_s01_{self.subject}_{self.date}_{self.condition}_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
-        self.fields = ['Time', 'Speed', 'Acceleration', 'Location', 'Steering', 'Throttle', 'Brake']
+        self.filename = f"./data/carla_s02_{self.subject}_{self.date}_{self.condition}_{time.time()}.csv"
+        self.fields = ['Time', 'Speed', 'Acceleration', 'Location', 'Steering', 'Throttle', 'Brake','TOR','Takeover']
+        self.tor = False
+        self.takeover = False
         with open(self.filename, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=self.fields)
             writer.writeheader()
+    def record_tor(self):
+        self.tor = True
+
+    def record_takeover(self):
+        self.takeover = True
 
     def record_data(self):
         last_speed = get_speed(self.vehicle)
@@ -40,7 +47,9 @@ class DataRecorder:
                 'Location': f"{location.x}, {location.y}, {location.z}",
                 'Steering': steering,
                 'Throttle': throttle,
-                'Brake': brake
+                'Brake': brake,
+                'TOR':self.tor,
+                'Takeover':self.takeover,
             }
 
             with open(self.filename, 'a', newline='') as f:
@@ -59,7 +68,7 @@ class DataRecorder:
         self.running = False
 
 class Vehicle_Control:
-    def __init__(self, vehicle):
+    def __init__(self, vehicle,sock,data_recoder):
         self.vehicle = vehicle  # 车子对象
         self.autopilot_flag = True  # 是否自动驾驶，默认沿着当前道路，没有路了就停止，为False可用方向盘驾驶
         self.lose_control = False  # 这个是有控制权，为True是失去所有控制
@@ -68,6 +77,8 @@ class Vehicle_Control:
         self.labour_low_speed_limit = 0  # 人工驾驶最低速度
         self.driver_status = "自动驾驶"
         self.instantaneous_speed = True
+        self.sock = sock
+        self.data_recoder = data_recoder
 
     def follow_lane(self):
         pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
@@ -79,7 +90,16 @@ class Vehicle_Control:
                     pass
                 elif self.autopilot_flag:
                     self.driver_status = "自动驾驶"
-                    self.autopilot_flag = not keyboard.is_pressed("q")
+
+
+                    for event in pygame.event.get():
+                        if event.type == pygame.JOYBUTTONDOWN:
+                            if event.button == 4 or event.button == 5:
+                                self.autopilot_flag = False
+                                self.data_recoder.record_takeover()
+                                message = 'play'
+                                sock.sendto(message.encode(), ('127.0.0.1', 12346)) 
+                    # self.autopilot_flag = not keyboard.is_pressed("q")
                     # 自动驾驶车辆，瞬时速度
                     if self.instantaneous_speed:
                         if get_speed(self.vehicle) < self.autopilot_speed_limit:
@@ -603,12 +623,19 @@ def check_vehicle_destroy(vehicle, vices, location):
 
 
 if __name__ == '__main__':
+    udp_ip = "127.0.0.1"  # IP of the destination computer
+    udp_port = 12346  # Port number on the destination computer
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP socket
+
     subject_id = "SUBJECT" if len(sys.argv) < 2 else sys.argv[1]
-    date = "DAY" if len(sys.argv) < 3 else sys.argv[2]
+    date_id = "DAY" if len(sys.argv) < 3 else sys.argv[2]
     condition = "CONDITION" if len(sys.argv) < 4 else sys.argv[3]
     destroy_all_vehicles_traffics()
+  
     vehicle = create_actor(main_car_location, model="vehicle.lincoln.mkz_2020")  # 创建主车
-    vehicle_control = Vehicle_Control(vehicle)  # 主车控制类
+    data_recorder = DataRecorder(vehicle,subject=subject_id,date=date_id,now_condition=condition)  # Initialize the data recorder
+    data_recorder.start_recording()  
+    vehicle_control = Vehicle_Control(vehicle,sock,data_recorder)  # 主车控制类
 
     Window(vehicle)  # 窗口
 
@@ -619,8 +646,7 @@ if __name__ == '__main__':
     vehicle_control.labour_low_speed_limit = 0
     vehicle_control.follow_lane()
 
-    data_recorder = DataRecorder(vehicle, subject=subject_id, date=date, condition=condition)  # Initialize the data recorder
-    data_recorder.start_recording()  
+
 
     for i in range(5):
         vice_control = Vice_Control()  # 副车控制类
@@ -635,6 +661,10 @@ if __name__ == '__main__':
         # 场景一
         while vehicle.get_location().distance(main_car_location) < 300:
             sleep(0.01)
+        message = "tor"
+        sock.sendto(message.encode(), (udp_ip, udp_port))
+        data_recorder.record_tor()
+
         print("请接管")
         # 场景一静1
         static_vice_car += [static_car1]  # 添加静止车辆列表
