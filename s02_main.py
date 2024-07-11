@@ -1,5 +1,62 @@
 from disposition import *
+import time
+from config import *
+import threading
+import csv
+import datetime
+import sys
 
+class DataRecorder:
+    def __init__(self, vehicle, subject, date, condition,rate=0.02):
+        self.vehicle = vehicle
+        self.subject = subject
+        self.date = date
+        self.condition = condition
+        self.vehicle = vehicle
+        self.rate = rate  # Data recording rate in seconds
+        self.running = True
+        self.filename = f"./data/carla_s01_{self.subject}_{self.date}_{self.condition}_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
+        self.fields = ['Time', 'Speed', 'Acceleration', 'Location', 'Steering', 'Throttle', 'Brake']
+        with open(self.filename, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=self.fields)
+            writer.writeheader()
+
+    def record_data(self):
+        last_speed = get_speed(self.vehicle)
+        last_time = time.time()
+
+        while self.running:
+            current_speed = get_speed(self.vehicle)
+            current_time = time.time()
+            acceleration = 0
+
+            location = self.vehicle.get_location()
+            steering, throttle, brake = get_steering_wheel_info()
+
+            data = {
+                'Time': time.time(),
+                'Speed': current_speed,
+                'Acceleration': acceleration,
+                'Location': f"{location.x}, {location.y}, {location.z}",
+                'Steering': steering,
+                'Throttle': throttle,
+                'Brake': brake
+            }
+
+            with open(self.filename, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=self.fields)
+                writer.writerow(data)
+
+            last_speed = current_speed
+            last_time = current_time
+
+            time.sleep(self.rate)
+
+    def start_recording(self):
+        threading.Thread(target=self.record_data).start()
+
+    def stop_recording(self):
+        self.running = False
 
 class Vehicle_Control:
     def __init__(self, vehicle):
@@ -309,27 +366,6 @@ class Vice_Control:
                 break
 
 
-def pedestrian_control(people, speed=8, yaw=0, target_location=None):
-    def con():
-        people_control = carla.WalkerControl(speed=speed / 3.6)
-        people_rotation = carla.Rotation(0, yaw, 0)
-        people_control.direction = people_rotation.get_forward_vector()
-        people.apply_control(people_control)
-
-        if target_location:
-            while True:
-                if people.get_location().distance(target_location) < 2:
-                    control = carla.WalkerControl()
-                    control.direction.x = 0
-                    control.direction.z = 0
-                    control.direction.y = 0
-                    people.apply_control(control)
-                    break
-                sleep(0.01)
-
-    threading.Thread(target=con).start()
-
-
 def create_actor(locations, model="vehicle.mini.cooper_s_2021", height=0.1):
     def create(location):
         transform = env_map.get_waypoint(location).transform
@@ -351,170 +387,6 @@ def create_actor(locations, model="vehicle.mini.cooper_s_2021", height=0.1):
     else:
         return create(locations)
 
-
-# 控制车辆刹车
-def brake_throttle_retard(vehicle, acceleration, target_speed):
-    """
-    加减速
-    :param vehicle: 目标车辆
-    :param acceleration: 加速度
-    :param target_speed: 目标速度
-    :return:
-    """
-    pid = VehiclePIDController(vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
-    t = time.time()
-    speed = get_speed(vehicle)
-    while abs(get_speed(vehicle) - target_speed) > 1:
-        # 获取前方道路
-        waypoint = env_map.get_waypoint(vehicle.get_location()).next(max(1, int(get_speed(vehicle) / 6)))
-        if waypoint:
-            waypoint = waypoint[0]
-        else:
-            print(f"前方没有路了,当前车子坐标{vehicle.get_location()},车子对象为{vehicle}")
-            return
-        result = pid.run_step(target_speed, waypoint)
-        result.brake = 0
-        result.throttle = 0
-        vehicle.apply_control(result)  # 这个只控制方向盘
-
-        sp = (max(0, speed + acceleration * (time.time() - t) * 3.6))
-        set_speed(vehicle, sp)
-        sleep(0.01)
-    for _ in range(10):
-        set_speed(vehicle, target_speed)
-        sleep(0.1)
-
-
-def load_map(xodr_path):
-    """
-    导入地图
-    :param xodr_path :  xodr文件路径
-    """
-    with open(xodr_path, encoding="utf-8") as f:
-        data = f.read()
-        vertex_distance = 1
-        max_road_length = 500
-        wall_height = 0.5
-        extra_width = 1
-        client.generate_opendrive_world(data,
-                                        carla.OpendriveGenerationParameters(vertex_distance=vertex_distance,
-                                                                            max_road_length=max_road_length,
-                                                                            wall_height=wall_height,
-                                                                            additional_width=extra_width,
-                                                                            smooth_junctions=True,
-                                                                            enable_mesh_visibility=True))
-
-
-# 获取当前车道的车辆，返回升序车辆列表
-def get_now_road_car(vehicle, next_vehicle=False, previous_vehicle=False):
-    """
-    返回当前车道的车辆
-    :param vehicle: 车子对象
-    :param next_vehicle: 前方车辆，默认获取，置为True,只获取前车
-    :param previous_vehicle: 后方车辆，默认获取，置为True,只获取后车
-    :return:  返回升序车辆列表，元组中第二个参数为True表示前方，False为后方
-    """
-
-    def distance_between_vehicles(vehicle, vehicle2):
-        return vehicle.get_location().distance(vehicle2.get_location())
-
-    def is_vehicle_in_front(target_vehicle, reference_vehicle):
-        """
-        返回是在车子前方还是后方
-        :param target_vehicle: 目标车
-        :param reference_vehicle: 主车，这个是主车
-        :return: 一个车辆列表，每个索引值是一个元组，包含车辆对象，前车or后车，距离
-        """
-        target_location = target_vehicle.get_location()
-        target_forward = target_vehicle.get_transform().get_forward_vector()
-
-        reference_location = reference_vehicle.get_location()
-
-        # 计算从参考车辆指向目标车辆的向量
-        vector_to_target = carla.Location(target_location.x - reference_location.x,
-                                          target_location.y - reference_location.y,
-                                          target_location.z - reference_location.z)
-
-        # 计算向量夹角（使用点积）
-        dot_product = target_forward.x * vector_to_target.x + target_forward.y * vector_to_target.y
-        magnitude_product = math.sqrt(target_forward.x ** 2 + target_forward.y ** 2) * math.sqrt(
-            vector_to_target.x ** 2 + vector_to_target.y ** 2)
-        angle = math.acos(dot_product / magnitude_product) * (180 / math.pi)
-
-        # 一般情况下，如果夹角小于90度，则目标车辆在主车辆的前方
-        return angle < 90
-
-    # 获取所有车辆对象
-    vice_cars = list(world.get_actors().filter("vehicle.*"))
-    vice_cars = [v for v in vice_cars if v.id != vehicle.id]  # 排除自车
-    vice_cars = [v for v in vice_cars if env_map.get_waypoint(v.get_location()).lane_id == env_map.get_waypoint(
-        vehicle.get_location()).lane_id]  # 只要当前车道车辆
-    if not vice_cars:
-        return None  # 该车道没有车
-
-    distance_list = [(v, is_vehicle_in_front(v, vehicle), distance_between_vehicles(vehicle, v)) for v in vice_cars]
-    sorted_list = sorted(distance_list, key=lambda x: x[2])
-
-    # 筛选
-    if next_vehicle:
-        return [tup for tup in sorted_list if tup[1] is True]
-    if previous_vehicle:
-        return [tup for tup in sorted_list if tup[1] is False]
-    return sorted_list
-
-
-def timed_function(interval, stop_event):
-    """
-    在函数上加上一下内容就可以实现定时器
-    stop_event = threading.Event()  # 用于停止定时器，执行stop_event.set()就可以停止该定时器
-    @timed_function(interval=0.01, stop_event=stop_event)
-    """
-
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            # 定义定时器回调函数
-            def timer_callback():
-                func(*args, **kwargs)
-                # 递归调用定时器，实现周期性执行
-                if not stop_event.is_set():
-                    threading.Timer(interval, timer_callback).start()
-
-            # 启动定时器
-            threading.Timer(interval, timer_callback).start()
-
-        return wrapper
-
-    return decorator
-
-
-def set_towards(vehicle):
-    """
-    单独设置车子的朝向
-    :param vehicle: 车子对象
-    :return:
-    """
-    transform = vehicle.get_transform()
-    vehicle.set_transform(transform)  # 这个需要的是transform对象
-
-
-def get_vehicle_steer(vehicle):
-    """
-    获取carla中车子方向盘值
-    :param vehicle: 车子对象
-    :return:
-    """
-    return vehicle.get_control().steer
-
-
-def get_vehicle_length(vehicle):
-    """
-    获取车子的长度
-    :param vehicle: 车子对象
-    :return: 返回车子的长宽高
-    """
-    car_length = vehicle.bounding_box.extent
-    return car_length.x * 2, car_length.y * 2, car_length.z * 2
 
 
 def draw_line(location1=None, location2=None, locations=None, thickness=0.1, life_time=10.0,
@@ -572,7 +444,7 @@ def get_steering_wheel_info():
     return: 方向盘、油门、刹车
     """
     # 这里0,2,3根据实际情况的方向盘参数
-    return joystick.get_axis(0), (-joystick.get_axis(2) + 1) / 2, (-joystick.get_axis(3) + 1) / 2
+    return joystick.get_axis(0), (-joystick.get_axis(1) + 1) / 2, (-joystick.get_axis(2) + 1) / 2
 
 
 def destroy_all_vehicles_traffics(vehicles=None, vehicle_flag=True, traffic_flag=True, people_flag=True):
@@ -600,3 +472,257 @@ def destroy_all_vehicles_traffics(vehicles=None, vehicle_flag=True, traffic_flag
     # 销毁每个车辆
     for actor in actors:
         actor.destroy()
+
+
+
+
+def brake_throttle_retard(vehicle, acceleration, target_speed, direction=True):
+    """
+    加减速
+    :param vehicle: 目标车辆
+    :param acceleration: 加速度
+    :param target_speed: 目标速度
+    :param direction: 方向
+    :return:
+    """
+    pid = VehiclePIDController(vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
+    t = time.time()
+    speed = get_speed(vehicle)
+    while abs(get_speed(vehicle) - target_speed) > 1:
+        if direction:
+            # 获取前方道路
+            waypoint = env_map.get_waypoint(vehicle.get_location()).next(max(1, int(get_speed(vehicle) / 6)))
+        else:
+            # 获取前方道路
+            waypoint = env_map.get_waypoint(vehicle.get_location()).previous(max(1, int(get_speed(vehicle) / 6)))
+        if waypoint:
+            waypoint = waypoint[0]
+        else:
+            print(f"前方没有路了,当前车子坐标{vehicle.get_location()},车子对象为{vehicle}")
+            return
+        result = pid.run_step(target_speed, waypoint)
+        result.brake = 0
+        result.throttle = 0
+        vehicle.apply_control(result)  # 这个只控制方向盘
+
+        sp = (max(0, speed + acceleration * (time.time() - t) * 3.6))
+        set_speed(vehicle, sp)
+        sleep(0.01)
+    for _ in range(10):
+        set_speed(vehicle, target_speed)
+        sleep(0.01)
+
+
+def right_left_lane(car, speed_limit=40, direction=None, min_direction=10, method="pid", line_number=1, draw=False):
+    """
+    左转或右转
+    :param car: 车子对象
+    :param speed_limit:速度限制
+    :param direction: 左转还是右转,接收"left"和"right"
+    :param min_direction: 最小变道距离
+    :param method: 变道所使用的方法，默认用pid，还有agent
+    :return:
+    """
+    # 判断有没有可变道路,得到direction方向值
+    if not direction:  # 如果没有传左/右变道
+        # 先判断左右是否有道路
+        direction = str(env_map.get_waypoint(car.get_location()).lane_change).lower()
+        if not direction:  # 如果没有可变道路，找前方看有没有可以变道
+            direction = str(env_map.get_waypoint(car.get_location()).next(max(get_speed(car), 5))[
+                                0].lane_change).lower()
+            if not direction:
+                print("没有可变道路！！！！！！！！")
+                return
+            elif direction == "both":
+                direction = random.choice(["right", "left"])
+        elif direction == "both":
+            direction = random.choice(["right", "left"])
+
+    # PID
+    pid = VehiclePIDController(car, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
+    # 获取当前速度
+    speed = get_speed(car)
+    # 设置速度防止车子在已有速度上突然减速
+    set_speed(car, speed)
+    # 变道距离,根据速度实现
+    distance = max(speed, min_direction)
+
+    while True:  # 获取到变道后的终点坐标
+        location = car.get_location()
+        if direction == "right":
+            for i in range(line_number):
+                location = env_map.get_waypoint(location).get_right_lane().transform.location
+        else:
+            for i in range(line_number):
+                location = env_map.get_waypoint(location).get_left_lane().transform.location
+        waypoint = env_map.get_waypoint(location)
+        if not waypoint:
+            sleep(0.01)
+            continue
+        waypoint = waypoint.previous(distance + 5 * line_number)[0]
+        break
+
+    end_location = waypoint.transform.location
+    if draw:
+        draw_line(locations=[car.get_location(), end_location],
+                  life_time=(15 - get_speed(car)) / 10)  # 划线
+    while True:
+        if car.get_location().distance(end_location) < 0.5:
+            now_time = time.time()
+            while time.time() - now_time < 0.1:  # 变道完成后再执行一秒往前开
+                waypoint = env_map.get_waypoint(car.get_location()).previous(int(get_speed(car)))
+                if waypoint:
+                    waypoint = waypoint[0]
+                else:
+                    print("变道完前方没路了")
+                result = pid.run_step(speed_limit, waypoint)
+                car.apply_control(result)
+                sleep(0.01)
+            print("变道完毕")
+            return
+        set_speed(car, speed_limit)
+        result = pid.run_step(speed_limit, waypoint)
+        car.apply_control(result)
+        sleep(0.01)
+
+
+def check_vehicle_destroy(vehicle, vices, location):
+    def check():
+        while True:
+            if not vices:
+                return
+            for car in vices:
+                distance1 = vehicle.get_location().distance(location)
+                distance2 = car.get_location().distance(location)
+                if distance1 > distance2 + 15:
+                    car.destroy()
+                    vices.remove(car)
+            sleep(0.01)
+
+    threading.Thread(target=check).start()
+
+
+if __name__ == '__main__':
+    subject_id = "SUBJECT" if len(sys.argv) < 2 else sys.argv[1]
+    date = "DAY" if len(sys.argv) < 3 else sys.argv[2]
+    condition = "CONDITION" if len(sys.argv) < 4 else sys.argv[3]
+    destroy_all_vehicles_traffics()
+    vehicle = create_actor(main_car_location, model="vehicle.lincoln.mkz_2020")  # 创建主车
+    vehicle_control = Vehicle_Control(vehicle)  # 主车控制类
+
+    Window(vehicle)  # 窗口
+
+    # 主车设置
+    # vehicle_control.autopilot_flag=False
+    vehicle_control.autopilot_speed_limit = 30
+    vehicle_control.labour_speed_limit = 30
+    vehicle_control.labour_low_speed_limit = 0
+    vehicle_control.follow_lane()
+
+    data_recorder = DataRecorder(vehicle, subject=subject_id, date=date, condition=condition)  # Initialize the data recorder
+    data_recorder.start_recording()  
+
+    for i in range(5):
+        vice_control = Vice_Control()  # 副车控制类
+        static_vice_car = []  # 静止车辆列表
+        static_vice_car += [vehicle]
+        # 副车设置
+        vice_control.follow_road()
+        vice_control.speed_limit = 15
+        print(f"第{i + 1}次仿真")
+        static_car1 = create_actor(
+            env_map.get_waypoint(curve_start_one_location).previous(20)[0].transform.location)
+        # 场景一
+        while vehicle.get_location().distance(main_car_location) < 300:
+            sleep(0.01)
+        print("请接管")
+        # 场景一静1
+        static_vice_car += [static_car1]  # 添加静止车辆列表
+        # 弯道处车
+        vice_car = create_actor(line_vice_location_one)
+        location = env_map.get_waypoint(curve_start_one_location).previous(40)[0].transform.location
+        while vehicle.get_location().distance(location) > 5:  # 到达距离起点四十米时
+            sleep(0.01)
+
+        vice_control.vices += [vice_car]
+
+        # 场景二
+        # 创建直道二的车
+        locations = []
+        location1 = env_map.get_waypoint(curve_end_one_location).next(20)[0].transform.location  # 静止车
+        location2 = env_map.get_waypoint(curve_end_one_location).next(30)[0].transform.location
+        location3 = env_map.get_waypoint(curve_end_one_location).next(40)[0].transform.location
+        locations += [location1, location2, location3]
+        vices = create_actor(locations)
+        static_vice_car += vices  # 添加静止车辆列表
+        while vehicle.get_location().distance(curve_end_one_location) > 5:  # 到达弯道终点
+            sleep(0.01)
+        # 启动直段二的车
+        vice_control.vices += vices[1:]
+        check_vehicle_destroy(vehicle, vices[1:], curve_end_one_location)  # 检查车辆中的车
+        # 等待到达场景二起点
+        while vehicle.get_location().distance(curve_start_two_location) > 40:
+            sleep(0.01)
+        destroy_all_vehicles_traffics(static_vice_car)  # 销毁车辆
+        # 场景二
+        locations = [line_vice_location_two,
+                     env_map.get_waypoint(line_vice_location_two).previous(15)[0].transform.location]
+        vices = create_actor(locations)
+        vice_control.vices = vices
+
+        # 等待到达场景三
+        locations = [env_map.get_waypoint(curve_start_three_location).previous(15)[0].transform.location,
+                     env_map.get_waypoint(curve_start_three_location).previous(30)[0].transform.location,
+                     env_map.get_waypoint(curve_start_three_location).previous(45)[0].transform.location]
+        vices = create_actor(locations)
+        static_vice_car += vices
+        while vehicle.get_location().distance(vices[0].get_location()) > 10:
+            sleep(0.01)
+        brake_throttle_retard(vices[0], 4, 40)
+        vice_control.vices = [vices[0]]
+        vice_control.speed_limit = 40
+
+        while vices[0].get_location().distance(curve_end_three_location) < 40:
+            sleep(0.01)
+        destroy_all_vehicles_traffics(static_vice_car)
+        vice_control.vices = []
+        right_left_lane(vices[0], 40, "left")
+        brake_throttle_retard(vices[0], -8, 0, False)
+
+        while vehicle.get_location().distance(curve_start_four_location) > 40:
+            sleep(0.01)
+        check_vehicle_destroy(vehicle, [vices[0]], line_vice_location_two)
+        destroy_all_vehicles_traffics(static_vice_car)
+        # 场景四
+        vices = [create_actor(line_vice_end_location_four, model="vehicle.kawasaki.ninja")]
+        locations = [env_map.get_waypoint(line_vice_end_location_four).previous(15)[0].transform.location,
+                     env_map.get_waypoint(line_vice_end_location_four).previous(30)[0].transform.location,
+                     env_map.get_waypoint(line_vice_end_location_four).previous(45)[0].transform.location,
+                     env_map.get_waypoint(line_vice_end_location_four).previous(60)[0].transform.location,
+                     env_map.get_waypoint(line_vice_end_location_four).previous(75)[0].transform.location,
+                     env_map.get_waypoint(line_vice_end_location_four).previous(90)[0].transform.location]
+        vices += create_actor(locations)
+        static_vice_car += vices
+        while vehicle.get_location().distance(curve_start_four_location) > 10:
+            sleep(0.01)
+        vice_control.vices = vices
+        vice_control.speed_limit = 15
+        destroy_all_vehicles_traffics(static_vice_car)
+
+        vices = create_actor([line_vice_end_location_five1, line_vice_end_location_five2, line_vice_end_location_five3])
+        while vehicle.get_location().distance(line_vice_end_location_five1) > 15:
+            sleep(0.01)
+        vice_control.vices += vices
+        while True:
+            distance1 = vehicle.get_location().distance(line_vice_end_location_five3)
+            distance2 = vices[-1].get_location().distance(line_vice_end_location_five3)
+            if distance1 > distance2 + 50:
+                destroy_all_vehicles_traffics(vehicle)
+                break
+            sleep(0.01)
+        while vehicle.get_location().distance(main_car_location) > 10:
+            sleep(0.01)
+        destroy_all_vehicles_traffics(vehicle)
+    while True:
+        sleep(1)
+        # print(vehicle.get_location())
