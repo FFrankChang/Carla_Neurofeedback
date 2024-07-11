@@ -8,6 +8,8 @@ from s01_config import *
 import random
 import csv
 from datetime import datetime 
+import re
+import sys  
 
 vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  # 驾驶状态
@@ -19,17 +21,43 @@ volume_size=0.5  # 音量大小
 global last_steer 
 last_steer =0
 
+def find_weather_presets():
+    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
+    name = lambda x: ' '.join(m.group(0) for m in rgx.finditer(x))
+    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
+    return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
+
+class WeatherController:
+    def __init__(self, world):
+        self.world = world
+        self.weather_options = find_weather_presets()
+        self.current_weather = 0  # 默认天气
+        # 设置特定天气为Cloudy Noon
+        for i, (_, weather_name) in enumerate(self.weather_options):
+            if weather_name == "Cloudy Noon":
+                self.current_weather = i
+                break
+        self.world.set_weather(self.weather_options[self.current_weather][0])
+        # print(f"Initial weather set to {self.weather_options[self.current_weather][1]}")
 class DataRecorder:
-    def __init__(self, filename=f"./data/carla_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv",frequency=100):
-        self.filename = filename
-        self.file = open(self.filename, 'w', newline='')
-        self.writer = csv.writer(self.file)
-        self.writer.writerow(['timestamp', 'Speed', 'Location_x', 'Location_y', 'Location_z', 'Steer', 'Acceleration_x', 'Acceleration_y', 'Acceleration_z', 'Gyro_x', 'Gyro_y', 'Gyro_z', 'Compass', 'Lead_Vehicle_Speed', 'Lead_Vehicle_X', 'Lead_Vehicle_Y', 'Lead_Vehicle_Z', 'Collision', 'TOR','Mode_Switched'])
+    def __init__(self,subject,date,condition,frequency=100):
         self.last_record_time = time.time()
         self.interval = 1.0 / frequency
         self.collision_detected = False
         self.mode_switched = False
         self.tor = False
+        self.subject = subject
+        self.date = date
+        self.condition = condition
+        self.file = None
+        self.init_file()
+
+    def init_file(self):
+        filename = f"./data/carla_s01_{self.subject}_{self.date}_{self.condition}_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
+        self.file = open(filename, 'w', newline='')
+        self.writer = csv.writer(self.file)
+        self.writer.writerow(['timestamp', 'Speed', 'Location_x', 'Location_y', 'Location_z', 'Steer', 'Acceleration_x', 'Acceleration_y', 'Acceleration_z', 'Gyro_x', 'Gyro_y', 'Gyro_z', 'Compass', 'Lead_Vehicle_Speed', 'Lead_Vehicle_X', 'Lead_Vehicle_Y', 'Lead_Vehicle_Z', 'Collision', 'TOR','Mode_Switched'])
+
     def record_collision(self):
         self.collision_detected = True
 
@@ -333,7 +361,7 @@ class Vice_Control:
                                 vices_car_list = [car for car in vices_car_list if car.id != next_car.id]
                             if next_car:
                                 self.thread_cut_speed = threading.Thread(target=self.brake_throttle_retard,
-                                                                        args=(next_car, -8.5, 0, 0, i == 0))
+                                                                        args=(next_car, -8.5, 0, 3, i == 0))
                                 self.thread_cut_speed.start()
                                 
             pid = VehiclePIDController(car, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
@@ -871,15 +899,10 @@ def set_speed(vehicle, speed_kmh):
 
 # 获取方向盘信息
 def get_steering_wheel_info_modified():
-
-    def non_linear_steering(x):
-        p = 1.5
-        return np.sign(x) * np.abs(x)**p
-    
     steering = joystick.get_axis(0)
     throttle = joystick.get_axis(1)
     brake = joystick.get_axis(2)
-    adjusted_steering = non_linear_steering(steering)
+    adjusted_steering = steering
     adjusted_throttle = (-throttle + 1) / 2
     adjusted_brake = (-brake + 1) / 2
 
@@ -1019,9 +1042,13 @@ def handle_collision(event, window,data_recorder):
     window.collision_detected = True  # 设置窗口类中的碰撞标志
 
 if __name__ == '__main__':
-    destroy_all_vehicles_traffics(world)  # 销毁所有车辆
-    data_recorder = DataRecorder()
+    subject_id = "SUBJECT" if len(sys.argv) < 2 else sys.argv[1]
+    date = "DAY" if len(sys.argv) < 3 else sys.argv[2]
+    condition = "CONDITION" if len(sys.argv) < 4 else sys.argv[3]
 
+    destroy_all_vehicles_traffics(world)  # 销毁所有车辆
+    data_recorder = DataRecorder(subject=subject_id,date=date,condition=condition)
+    weather_controller = WeatherController(world)
     draw_arrow([easy_location8, easy_location1, interfere_one_location1, interfere_two_location1, easy_location2,
                 interfere_one_location2,
                 end_location1, easy_location3, interfere_two_location2, end_location2, easy_location4, easy_location5,
@@ -1031,16 +1058,6 @@ if __name__ == '__main__':
                 end_location4])  # 划线
     vehicle_traffic = Vehicle_Traffic(world)  # 车辆创建对象
     vehicle = vehicle_traffic.create_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]  # 创建主车
-
-    physics_control = vehicle.get_physics_control() # 修改车辆控制参数
-    steering_curve = [
-        carla.Vector2D(x=0.0, y=1.0),
-        carla.Vector2D(x=20.0, y=0.9),
-        carla.Vector2D(x=80.0, y=0.8),
-        carla.Vector2D(x=120.0, y=0.2)
-    ]
-    physics_control.steering_curve = steering_curve
-    vehicle.apply_physics_control(physics_control)
 
     destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
     window = Window(world, blueprint_library, vehicle)  # 创建窗口

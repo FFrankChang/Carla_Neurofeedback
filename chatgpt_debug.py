@@ -9,13 +9,8 @@ import random
 
 
 vices_car_list = []  # 所有副车列表
-drive_status = "自动驾驶"  # 驾驶状态
-directions = []  # 变道顺序, 前提前方有车
-scene_status = "简单场景"  # 干扰场景一   简单场景
-left_right_qian_distance = 0
-left_right_hou_distance = 0
-global last_steer 
-last_steer =0
+drive_status = "自动驾驶"  
+scene_status = "简单场景"  
 
 class Vehicle_Traffic:
     def __init__(self, world):
@@ -91,26 +86,9 @@ class Main_Car_Control:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP socket
         self.lead_vehicle = None
 
-    def update_lead_vehicle(self):
-        vehicles = self.world.get_actors().filter('vehicle.*')
-        vehicles = [v for v in vehicles if v.id != self.vehicle.id]
-        self.lead_vehicle = None
-        min_distance = float('inf')
-        vehicle_location = self.vehicle.get_location()
-        vehicle_forward = self.vehicle.get_transform().get_forward_vector()
-
-        for v in vehicles:
-            v_location = v.get_location()
-            vector_to_v = v_location - vehicle_location
-            distance = vector_to_v.length()
-            if vector_to_v.dot(vehicle_forward) > 0:  # 确认车辆在前方
-                if distance < min_distance:
-                    min_distance = distance
-                    self.lead_vehicle = v
-
 
     def follow_road(self):
-        global drive_status, scene_status, directions
+        global drive_status, scene_status
         self.flag = True
         pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
         while self.flag:
@@ -128,25 +106,6 @@ class Main_Car_Control:
                     if get_speed(self.vehicle) < self.speed_limit:
                         set_speed(self.vehicle, self.speed_limit)
 
-                # 判断变道
-                if scene_status == "干扰场景一":
-                    now_right_left_lane_info = get_now_road_car(self.vehicle, now_lane_flag=True)
-                    now_lane_next_car_info = now_right_left_lane_info.get("now_lane").get("next_info")  # 前车信息
-                    if now_lane_next_car_info:  # 如果有前车
-                        if now_lane_next_car_info[0][1] < self.speed_limit:  # 如果满足条件
-                            if directions:
-                                right_left_lane(self.vehicle, direction=directions.pop(0))  # 这样不加这个就是自动识别变道
-                            else:
-                                right_left_lane(self.vehicle)  # 这样不加这个就是自动识别变道
-                    else:
-                        directions.clear()
-                        pass
-                elif scene_status == "简单场景":
-                    if not pygame.mixer.music.get_busy():
-                        pass
-                    now_right_left_lane_info = get_now_road_car(self.vehicle, now_lane_flag=True)
-                    now_lane_next_car_info = now_right_left_lane_info.get("now_lane").get("next_info")  # 前车信息
-                # 获取前方道路
                 waypoint = env_map.get_waypoint(self.vehicle.get_location()).next(
                     max(1, int(get_speed(self.vehicle) / 3)))
                 if waypoint:
@@ -208,16 +167,13 @@ class Vice_Control:
     def control_car(self, cars):
         global vices_car_list, scene_status
         for car in cars:
-            if scene_status == "简单场景" or scene_status == "干扰场景一":
+            if scene_status == "简单场景":
                 if not self.thread_cut_speed.is_alive():  # 如果没有车减速
-                    # print("前车开始减速")
-                    qian_road_car_info = get_now_road_car(self.main_car, now_lane_flag=True).get("now_lane").get(
-                        "next_info")
+                    qian_road_car_info = get_now_road_car(self.main_car, now_lane_flag=True).get("now_lane").get("next_info")
                     if qian_road_car_info:
                         next_car = qian_road_car_info[0][0]  # 前车对象
                         vices_car_list = [car for car in vices_car_list if car.id != next_car.id]  # 除去前车的控制
-                        self.thread_cut_speed = threading.Thread(target=brake_throttle_retard,
-                                                                args=(next_car, -8.5, 0, 3,))  # 减速线程,第四个参数是延迟
+                        self.thread_cut_speed = threading.Thread(target=brake_throttle_retard,args=(next_car, -8.5, 0, 3,))  # 减速线程,第四个参数是延迟
                         self.thread_cut_speed.start()
 
             pid = VehiclePIDController(car, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
@@ -231,95 +187,12 @@ class Vice_Control:
 
             speed_limit = road_speed_limit[env_map.get_waypoint(car.get_location()).lane_id]  # 获取车道的速度限制
             result = pid.run_step(speed_limit, waypoint)
-            if get_speed(car) < speed_limit - 20:
+            if get_speed(car) < speed_limit:
                 set_speed(car, speed_limit)
             car.apply_control(result)
 
-def right_left_lane(main_car, direction=None, min_direction=10, method="pid"):
-    """
-    左转或右转
-    :param direction: 左转还是右转,接收"left"和"right"
-    :param min_direction: 最小变道距离
-    :param method: 变道所使用的方法，默认用pid，还有agent
-    :return:
-    """
-    # 判断有没有可变道路,得到direction方向值
-    if not direction:  # 如果没有传左/右变道
-        # 先判断左右是否有道路
-        direction = str(env_map.get_waypoint(main_car.get_location()).lane_change).lower()
-        if not direction:  # 如果没有可变道路，找前方看有没有可以变道
-            direction = str(
-                env_map.get_waypoint(main_car.get_location()).next(max(get_speed(main_car), 5))[0].lane_change).lower()
-            if not direction:
-                print("没有可变道路！！！！！！！！")
-                return
-            elif direction == "both":
-                direction = random.choice(["right", "left"])
-        elif direction == "both":
-            direction = random.choice(["right", "left"])
-
-    # PID
-    pid = VehiclePIDController(main_car, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
-    # 获取当前速度
-    speed = get_speed(main_car)
-    # 设置速度防止车子在已有速度上突然减速
-    set_speed(main_car, speed)
-    # 变道距离,根据速度实现
-    distance = max(speed + 20, min_direction)
-
-    while True:  # 获取到变道后的终点坐标
-        if direction == "right":
-            waypoint = env_map.get_waypoint(main_car.get_location()).get_right_lane()
-        else:
-            waypoint = env_map.get_waypoint(main_car.get_location()).get_left_lane()
-        if not waypoint:
-            sleep(0.01)
-            continue
-        waypoint = waypoint.next(distance)[0]
-        break
-
-    end_location = waypoint.transform.location
-
-    while True:
-        speed_limit = road_speed_limit[env_map.get_waypoint(main_car.get_location()).lane_id]
-
-        if main_car.get_location().distance(end_location) < 0.5:
-            now_time = time.time()
-            while time.time() - now_time < 1:  # 变道完成后再执行一秒往前开
-                waypoint = env_map.get_waypoint(main_car.get_location()).next(int(get_speed(main_car)))[0]
-                result = pid.run_step(speed_limit, waypoint)
-                main_car.apply_control(result)
-                sleep(0.01)
-            print("变道完毕")
-            return True
-        result = pid.run_step(speed_limit, waypoint)
-        main_car.apply_control(result)
-        sleep(0.01)
-
-
-def draw_line(location1=None, location2=None, locations=None, thickness=0.1, life_time=10,
-              color=carla.Color(255, 0, 0)):
-    """
-    用直线连接两个点或者多个点
-    :param location1: carla坐标点1
-    :param location2: carla坐标点2
-    :param locations: 坐标点列表，如果传入坐标点列表，前面两个点失效,carla坐标点列表
-    :param thickness: 亮度
-    :param life_time: 存活时间
-    :param color: 颜色
-    :return: 没有返回，绘制出连线点
-    """
-    if locations:
-        for index, location in enumerate(locations[1:]):
-            world.debug.draw_line(locations[index], location, thickness=thickness, color=color, life_time=life_time)
-        return
-    world.debug.draw_line(location1, location2, thickness=thickness, color=color, life_time=life_time)
-
-
-# 设置刹车灯
 def set_brake_lights(vehicle):
     lights = carla.VehicleLightState.Brake
-    # # 设置车辆的灯光状态
     vehicle.set_light_state(carla.VehicleLightState(lights))
 
 
@@ -349,7 +222,6 @@ def brake_throttle_retard(vehicle, acceleration, target_speed, delay=0):
         vehicle.apply_control(result)
         sleep(0.01)
     if acceleration < 0:
-        # print(f"我开始减速了")
         pass
     set_brake_lights(vehicle)
     t = time.time()
@@ -371,10 +243,10 @@ def brake_throttle_retard(vehicle, acceleration, target_speed, delay=0):
         sp = speed + acceleration * (time.time() - t) * 3.6
         sp = (max(0, sp))
         set_speed(vehicle, sp)
-        sleep(0.01)
+        sleep(0.001)
     for _ in range(10):
         set_speed(vehicle, target_speed)
-        sleep(0.01)
+        sleep(0.001)
 
 
 class Window:
@@ -388,7 +260,6 @@ class Window:
         self.world = world
         self.vehicle = vehicle
         # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
-        self.collision_detected = False  # 添加此行来追踪碰撞状态
 
         self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
@@ -430,7 +301,7 @@ class Window:
 
     # 加载图片
     def process_img(self, image):
-        global drive_status, left_right_qian_distance, left_right_hou_distance
+        global drive_status
         i = np.array(image.raw_data)
         i2 = i.reshape((self.SCREEN_HEIGHT, self.SCREEN_WIDTH, 4))
         i3 = i2[:, :, :3]
@@ -438,23 +309,6 @@ class Window:
         i3 = i3[..., ::-1]
         img_surface = pygame.surfarray.make_surface(np.flip(i3, axis=0))
         self.screen.blit(img_surface, (0, 0))  # 绘制图片
-
-        # 添加文字信息
-        self.draw_text(f"自车速度：{round(get_speed(self.vehicle), 2)}km/h", 20, (0, 0))
-
-        list_of_cars_ahead = get_now_road_car(self.vehicle, now_lane_flag=True)  # 获取到当前道路的车
-        next_car_info = list_of_cars_ahead.get("now_lane").get("next_info")  # 获取到前车信息
-        if next_car_info:
-            self.draw_text(f"前车速度：{round(get_speed(next_car_info[0][0]), 2)}km/h", 20, (0, 20))
-            self.draw_text(f"与前车距离：{round(next_car_info[0][1], 2)}m", 20, (0, 40))
-        self.draw_text(f"场景状态：{scene_status}", 20, (0, 60))
-        self.draw_text(f"状态：{drive_status}", 20, (0, 80))
-        fps = self.clock.get_fps()
-        self.draw_text(f"当前帧率：{int(fps)}", 20, (0, 100))
-        if self.collision_detected:
-            self.draw_text("Collision!", 160, (self.SCREEN_WIDTH // 2-200, self.SCREEN_HEIGHT // 2), bold=True,color=(255, 0, 0))
-            self.collision_detected = False  # 重置碰撞状态
-        # 刷新屏幕
         pygame.display.flip()
 
     def draw_text(self, word, size, position, bold=False, color=(255, 0, 0)):
@@ -472,14 +326,6 @@ class Window:
         text_rect.topleft = position
         self.screen.blit(text, text_rect)
 
-
-def smooth_steer(steer_input):
-    global last_steer
-    alpha = 0.7  
-    smoothed_steer = alpha * steer_input + (1 - alpha) * last_steer
-    last_steer = smoothed_steer
-    return smoothed_steer
-
 def car_control(vehicle, steer=0, throttle=1, brake=0):
     """
     控制车辆
@@ -490,41 +336,12 @@ def car_control(vehicle, steer=0, throttle=1, brake=0):
     :return:
     """
     # 保留三位小数，防止车辆不被控制，可能控制器只能接受三位小数
-    steer = smooth_steer(steer)
     steer = round(steer, 3)
     throttle = round(throttle, 3)
     brake = round(brake, 3)
     control = carla.VehicleControl(steer=steer, throttle=throttle, brake=brake)
     vehicle.apply_control(control)
 
-
-def is_vehicle_in_front(target_vehicle, reference_vehicle):
-    """
-    返回是在车子前方还是后方
-    :param target_vehicle: 目标车
-    :param reference_vehicle: 主车，这个是主车
-    :return: 一个车辆列表，每个索引值是一个元组，包含车辆对象，前车or后车，距离
-    """
-    target_location = target_vehicle.get_location()
-    target_forward = target_vehicle.get_transform().get_forward_vector()
-
-    reference_location = reference_vehicle.get_location()
-
-    # 计算从参考车辆指向目标车辆的向量
-    vector_to_target = carla.Location(target_location.x - reference_location.x,
-                                      target_location.y - reference_location.y,
-                                      target_location.z - reference_location.z)
-
-    # 计算向量夹角（使用点积）
-    dot_product = target_forward.x * vector_to_target.x + target_forward.y * vector_to_target.y
-    magnitude_product = math.sqrt(target_forward.x ** 2 + target_forward.y ** 2) * math.sqrt(
-        vector_to_target.x ** 2 + vector_to_target.y ** 2)
-    if magnitude_product == 0:
-        return True
-    angle = math.acos(dot_product / magnitude_product) * (180 / math.pi)
-
-    # 一般情况下，如果夹角小于90度，则目标车辆在主车辆的前方
-    return angle < 90
 
 def create_vices(vehicle_traffic, vehicle):
     """
@@ -734,7 +551,7 @@ def get_steering_wheel_info():
     """
     return: 方向盘、油门、刹车
     """
-    return joystick.get_axis(0)/3, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
+    return joystick.get_axis(0), (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
 
 
 def destroy_lose_vehicle(main_car):  # 销毁失控车辆
@@ -747,15 +564,12 @@ def destroy_lose_vehicle(main_car):  # 销毁失控车辆
 
             vices_car_ids = [car.id for car in vices_car_list]  # 有控制的副车列表id
             lose_vices = [car for car in all_vehicle if car.id not in vices_car_ids]  # 失去控制的车辆列表
-            # print(lose_vices)
             for car in lose_vices:
                 distance = main_car.get_location().distance(car.get_location())
-                # print(f"{lose_vices},距离{distance}")
                 if distance < 10:
                     sleep(1)
                     car.destroy()
             sleep(0.1)
-
     threading.Thread(target=destroy).start()
 
 def destroy_vice(vehicle):  # 销毁除自车以外的所有车辆
@@ -782,7 +596,7 @@ def scene_jian(vehicle, main_car_control, vice_car_control, end_location):  # �
     threading.Thread(target=main_car_control.follow_road).start()  # 启动主车
     threading.Thread(target=vice_car_control.follow_road).start()  # 启动副车
 
-    scene_status = "等待36s开始"  # 36s
+    scene_status = "等待36s开始"  
     t = time.time()
     time_gap = 3
     while time.time() - t < time_gap:
@@ -798,16 +612,6 @@ def scene_jian(vehicle, main_car_control, vice_car_control, end_location):  # �
     main_car_control.autopilot_flag = True
     print("到达终点")
 
-
-def interim(vehicle, main_car_control, end_location):  # 转弯过渡
-    global scene_status
-    scene_status = "转弯过渡"
-    threading.Thread(target=main_car_control.follow_road).start()  # 启动主车
-    while vehicle.get_location().distance(end_location) > 30:  # 如果离终点小于十米就认为干扰场景一
-        sleep(1)  # 每间隔一秒判断是否到没有到终点
-    main_car_control.flag = False  # 停止主车控制
-    main_car_control.stop_vehicle()  # 停止主车运行
-    main_car_control.autopilot_flag = True
 
 if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  # 销毁所有车辆
