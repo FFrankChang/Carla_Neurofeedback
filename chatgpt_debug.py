@@ -408,9 +408,6 @@ def get_now_road_car(vehicle, now_lane_flag=False, left_lane_flag=False, right_l
     :return: 一个字典，根据距离排好序的车辆
     """
 
-    # 定义一个函数用于排序
-    def sort_by_distance(item):
-        return item[1]
 
     def distance_between_vehicles(vehicle, vehicle2):
         return vehicle.get_location().distance(vehicle2.get_location())
@@ -579,15 +576,6 @@ def destroy_vice(vehicle):  # 销毁除自车以外的所有车辆
         car.destroy()
 
 
-def draw_arrow(locations, height=-1):
-    debug = world.debug
-    for location in locations:
-        arrow_location = location + carla.Location(z=height)  # 假设箭头位置略高于地面
-
-        # 绘制箭头
-        debug.draw_arrow(arrow_location, env_map.get_waypoint(arrow_location).next(10)[0].transform.location,
-                         thickness=0.3, arrow_size=0.5, color=carla.Color(255, 0, 0))
-
 
 def scene_jian(vehicle, main_car_control, vice_car_control, end_location):  # 简单场景
     global scene_status, vices_car_list
@@ -603,29 +591,15 @@ def scene_jian(vehicle, main_car_control, vice_car_control, end_location):  # �
         scene_status = f"倒计时{int(time_gap - (time.time() - t))}s (简单场景)"
         sleep(1)
     scene_status = "简单场景"
-    while vehicle.get_location().distance(end_location) > 30:  # 如果离终点小于十米就认为场景一结束
-        sleep(1)  # 每间隔一秒判断是否到没有到终点
-    main_car_control.flag = False  # 停止主车控制
-    main_car_control.stop_vehicle()  # 停止主车运行
-    vices_car_list.clear()
-    destroy_vice(vehicle)  # 销毁除自车以外的所有车辆
-    main_car_control.autopilot_flag = True
-    print("到达终点")
+
 
 
 if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  # 销毁所有车辆
 
-    draw_arrow([easy_location8, easy_location1, interfere_one_location1, interfere_two_location1, easy_location2,
-                interfere_one_location2,
-                end_location1, easy_location3, interfere_two_location2, end_location2, easy_location4, easy_location5,
-                interfere_two_location3,
-                easy_location6, interfere_two_location4, interfere_one_location3, end_location3, easy_location7,
-                interfere_two_location5,
-                end_location4])  # 划线
     vehicle_traffic = Vehicle_Traffic(world)  # 车辆创建对象
     vehicle = vehicle_traffic.create_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]  # 创建主车
-    destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
+    destroy_lose_vehicle(vehicle)  
     window = Window(world, blueprint_library, vehicle)  # 创建窗口
     main_car_control = Main_Car_Control(vehicle,world, True)  # 主车控制类
     vice_car_control = Vice_Control(vehicle)  # 副车控制类
