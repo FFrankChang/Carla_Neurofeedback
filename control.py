@@ -12,7 +12,7 @@ sock.bind((UDP_IP, UDP_PORT))
 
 # Create a socket for sending messages
 send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-send_ip = "0.0.0.0"
+send_ip = "127.0.0.1"
 send_port = 12347
 
 process = None
