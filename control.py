@@ -11,9 +11,9 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
 
 # Create a socket for sending messages
-send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-send_ip = "127.0.0.1"
-send_port = 12347
+# send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# send_ip = "127.0.0.1"
+# send_port = 12347
 
 process = None
 
@@ -88,12 +88,11 @@ try:
                 process = None
 
                 # Send message "pause" to local port 12347
-                message = "pause".encode()
-                send_sock.sendto(message, (send_ip, send_port))
-                print(f"Sent 'pause' to {send_ip}:{send_port}")
+                # message = "pause".encode()
+                # send_sock.sendto(message, (send_ip, send_port))
+                # print(f"Sent 'pause' to {send_ip}:{send_port}")
 
             else:
                 print("No script is running.")
 finally:
     sock.close()
-    send_sock.close()  # Also close the sending socket
