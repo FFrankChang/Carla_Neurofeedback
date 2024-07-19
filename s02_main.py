@@ -3,7 +3,7 @@ import time
 from config import *
 import threading
 import csv
-import datetime
+from datetime import datetime
 import sys
 import socket
 class DataRecorder:
@@ -15,7 +15,7 @@ class DataRecorder:
         self.vehicle = vehicle
         self.rate = 0.02  # Data recording rate in seconds
         self.running = True
-        self.filename = f"./data/carla_s02_{self.subject}_{self.date}_{self.condition}_{time.time()}.csv"
+        self.filename = f"./data/carla_s02_{self.subject}_{self.date}_{self.condition}_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
         self.fields = ['Time', 'Speed', 'Acceleration', 'Location', 'Steering', 'Throttle', 'Brake','TOR','Takeover']
         self.tor = False
         self.takeover = False

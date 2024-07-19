@@ -112,7 +112,6 @@ class Vehicle_Traffic:
             volkswagen, mercedes, citroen, nissan, mitsubishi, lincoln, mini, bh, vespa, carlamotors, jeep, gazelle, toyota
         """
         vehicles = []
-        # 如果传了车型就用指定车型，否则随机车型
         if vehicle_model:
             # 获取车辆的蓝图
             blueprint_car = self.blueprint_library.filter('*vehicle*')
@@ -120,12 +119,13 @@ class Vehicle_Traffic:
             cars = [bp for bp in blueprint_car if vehicle_model in bp.id.lower()]
         else:
             # 获取车辆的蓝图
-            blueprint_car = self.blueprint_library.filter('*crown*')
+            blueprint_car = self.blueprint_library.filter('*vehicle*')
             cars = [
-                x for x in blueprint_car 
+                x for x in blueprint_car
                 if int(x.get_attribute('number_of_wheels')) == 4 
                 and x.get_attribute('has_lights').as_bool() == True
                 and x.get_attribute('base_type').as_str() == 'car'
+                and x.id.lower() != "vehicle.lincoln.mkz_2020"  # 排除指定车型
             ]
         # 如果没有传入生成点，随机位置生成
         if not points:
