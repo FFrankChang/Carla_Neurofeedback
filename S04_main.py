@@ -1,15 +1,65 @@
 import threading
-import time
 import carla
 import pygame
 from disposition import *
 from s01_config import *
 import random
+import csv
+import time
+from datetime import datetime
+
 
 
 vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  
 scene_status = "简单场景"  
+
+
+class DataRecorder(threading.Thread):
+    def __init__(self, control_instance, interval=0.1):
+        super().__init__()
+        self.control = control_instance
+        self.interval = interval
+        self.fields = ['timestamp', 'vehicle_x', 'vehicle_y', 'steer_value', 'event_triggered', 'event_value']
+        self.running = True
+        self.filename = self.setup_filename()
+        self.setup_file()
+
+    def setup_filename(self):
+        directory = './data'
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        date_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return os.path.join(directory, f'C04_{date_time}.csv')
+
+    def setup_file(self):
+        with open(self.filename, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=self.fields)
+            writer.writeheader()
+
+    def run(self):
+        while self.running:
+            current_time = time.time()
+            vehicle = self.control.vehicle
+            data = {
+                'timestamp': current_time,
+                'vehicle_x': vehicle.get_location().x,
+                'vehicle_y': vehicle.get_location().y,
+                'steer_value': self.control.steer,
+                'event_triggered': self.control.random_steer_active,
+                'event_value': self.control.random_steer_value if self.control.random_steer_active else 0
+            }
+            self.record_data(data)
+            time.sleep(self.interval)
+
+    def record_data(self, data):
+        with open(self.filename, 'a', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=self.fields)
+            writer.writerow(data)
+
+    def stop(self):
+        self.running = False
+        self.join()
 
 class Vehicle_Traffic:
     def __init__(self, world):
@@ -60,26 +110,28 @@ class Main_Car_Control:
         self.instantaneous_speed = instantaneous_speed  # 是否瞬时到达目标速度
         self.scene_status = "简单场景"
         self.world = world
-        self.autopilot_flag = True  # 是否自动驾驶
+        self.autopilot_flag = False  # 是否自动驾驶
         self.speed_limit = 100  # 主车速度限制
         self.flag = True
         self.lead_vehicle = None
-        self.random_steer_event_time = 0
-        self.random_steer_event_active = False
+        self.next_event_time = time.time() + 6
+        self.steer_duration = 0  # 偏移持续时间
+        self.steer_event_end_time = 0  # 偏移结束时间
+        self.random_steer_active = False
+        self.random_steer_value = 0
+        self.steer = 0
 
     def follow_road(self):
         global drive_status, scene_status
         self.flag = True
         pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
         while self.flag:
+            current_time = time.time()
             self.speed_limit = road_speed_limit[env_map.get_waypoint(self.vehicle.get_location()).lane_id]
             if self.autopilot_flag:
                 drive_status = "自动驾驶"
                 if keyboard.is_pressed("q"):
                     self.autopilot_flag = False
-                elif keyboard.is_pressed("e"):  
-                    self.autopilot_flag = True
-
                 if self.instantaneous_speed:
                     if get_speed(self.vehicle) < self.speed_limit:
                         set_speed(self.vehicle, self.speed_limit)
@@ -100,22 +152,29 @@ class Main_Car_Control:
                 sleep(0.01)
             else:
                 drive_status = "人工驾驶"
-                if not self.random_steer_event_active and random.random() < 0.01:  # Each cycle, 1% chance to trigger
+                if keyboard.is_pressed("e"):  
+                    self.autopilot_flag = True
+                if not self.random_steer_active and current_time >= self.next_event_time:
                     self.trigger_random_steer_event()
                 steer, throttle, brake = get_steering_wheel_info()
-                if self.random_steer_event_active:
-                    steer += random.choice([-0.2, 0.2])  # Randomly induce a steer offset
-                    if abs(steer) > 1:  # Checking if the steer correction is made
-                        self.random_steer_event_active = False
-                        self.driver_response_time = time.time() - self.random_steer_event_time
-                        print(f"Driver response time: {self.driver_response_time:.2f} seconds")
-                car_control(self.vehicle, steer, throttle, brake)
+                self.steer = steer
+                if self.random_steer_active:
+                    if current_time <= self.steer_event_end_time:
+                        steer += self.random_steer_value
+                    else:
+                        self.random_steer_active = False
+                        self.next_event_time = current_time + random.randint(8, 12)
+                car_control(self.vehicle, steer, 0, 0)
+                set_speed(self.vehicle, 80)
                 sleep(0.01)
+
     def trigger_random_steer_event(self):
         """Activate a random steer event."""
-        self.random_steer_event_active = True
-        self.random_steer_event_time = time.time()
-        print("Random steer event triggered!")
+        self.random_steer_active = True
+        self.random_steer_value = random.choice([-0.1, 0.1, -0.05, 0.05])
+        self.steer_duration = random.uniform(0.1, 0.2)  
+        self.steer_event_end_time = time.time() + self.steer_duration
+        print(f"Random steer event triggered for {self.steer_duration:.2f} seconds with steer {self.random_steer_value:.2f}!")
 
 class Window:
     def __init__(self, world, blueprint_library, vehicle):
@@ -137,7 +196,7 @@ class Window:
         # 初始化窗口设置
         self.clock = pygame.time.Clock()
         self.size = 18  # 字体大小
-        self.fps = 60  # 帧率
+        self.fps = 90  # 帧率
         self.font = pygame.font.Font(r"TTF\宋体.ttf", self.size)  # 初始化字体对象
 
         # 初始化传感器
@@ -311,7 +370,7 @@ def scene_jian(vehicle, main_car_control, end_location):  # 简单场景
 
     threading.Thread(target=main_car_control.follow_road).start()  # 启动主车
 
-    scene_status = "等待36s开始"  
+    scene_status = "等待开始"  
     t = time.time()
     time_gap = 3
     while time.time() - t < time_gap:
@@ -329,7 +388,14 @@ if __name__ == '__main__':
     destroy_lose_vehicle(vehicle)  
     window = Window(world, blueprint_library, vehicle)  # 创建窗口
     main_car_control = Main_Car_Control(vehicle,world, True)  # 主车控制类
-
+    
+    recorder = DataRecorder(main_car_control)
+    recorder.start()
+    
     scene_jian(vehicle, main_car_control, interfere_one_location1)
-    while True:
-        sleep(1)
+    
+    try:
+        while True:
+            sleep(1)
+    finally:
+        recorder.stop()
