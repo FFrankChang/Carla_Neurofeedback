@@ -107,16 +107,16 @@ class Main_Car_Control:
         :param instantaneous_speed: 是否瞬时速度
         """
         self.vehicle = main_car  # 主车对象
-        self.instantaneous_speed = instantaneous_speed  # 是否瞬时到达目标速度
+        self.instantaneous_speed = instantaneous_speed  
         self.scene_status = "简单场景"
         self.world = world
-        self.autopilot_flag = False  # 是否自动驾驶
-        self.speed_limit = 100  # 主车速度限制
+        self.autopilot_flag = False  
+        self.speed_limit = 100  
         self.flag = True
         self.lead_vehicle = None
         self.next_event_time = time.time() + 6
-        self.steer_duration = 0  # 偏移持续时间
-        self.steer_event_end_time = 0  # 偏移结束时间
+        self.steer_duration = 0  
+        self.steer_event_end_time = 0  
         self.random_steer_active = False
         self.random_steer_value = 0
         self.steer = 0
@@ -186,9 +186,8 @@ class Window:
         """
         self.world = world
         self.vehicle = vehicle
-        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
-
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
+        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
         self.fonts = {} 
         pygame.init()  # 初始化pygame
@@ -203,8 +202,8 @@ class Window:
         self.blueprint_camera = blueprint_library.find('sensor.camera.rgb')  # 选择一个传感器蓝图
         self.blueprint_camera.set_attribute('image_size_x', f'{self.SCREEN_WIDTH}')  # 传感器获得的图片高度
         self.blueprint_camera.set_attribute('image_size_y', f'{self.SCREEN_HEIGHT}')  # 传感器获得的图片宽度
-        self.blueprint_camera.set_attribute('fov', '145')  # 水平方向上能看到的视角度数
-        spawn_point = carla.Transform(carla.Location(x=0.15, y = -0.21, z=1.15), carla.Rotation(pitch=7, yaw=0, roll=0))  # 传感器相对车子的位置设置
+        self.blueprint_camera.set_attribute('fov', '135')  # 水平方向上能看到的视角度数
+        spawn_point = carla.Transform(carla.Location(x=0.15, y = -0.21, z=1.25), carla.Rotation(pitch=-5, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = self.world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
 
         threading.Thread(target=self.show_screen).start()
@@ -335,8 +334,8 @@ def get_steering_wheel_info():
     """
     return: 方向盘、油门、刹车
     """
-    # return joystick.get_axis(0), (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
-    return 0, 0, 0
+    return joystick.get_axis(0), (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
+    # return 0, 0, 0
 
 
 def destroy_lose_vehicle(main_car):  # 销毁失控车辆
