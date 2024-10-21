@@ -2,7 +2,7 @@ import threading
 import carla
 import pygame
 from disposition import *
-from s04_config import *
+from s04_config_simple import *
 import random
 import csv
 import time
@@ -20,7 +20,7 @@ class DataRecorder(threading.Thread):
         super().__init__()
         self.control = control_instance
         self.interval = interval
-        self.fields = ['timestamp', 'vehicle_x', 'vehicle_y', 'steer_value', 'event_triggered', 'event_value']
+        self.fields = ['timestamp', 'vehicle_x', 'vehicle_y', 'steer', 'throttle', 'brake', 'event_triggered', 'event_value']
         self.running = True
         self.filename = self.setup_filename()
         self.setup_file()
@@ -45,7 +45,9 @@ class DataRecorder(threading.Thread):
                 'timestamp': current_time,
                 'vehicle_x': vehicle.get_location().x,
                 'vehicle_y': vehicle.get_location().y,
-                'steer_value': self.control.steer,
+                'steer': self.control.steer,
+                'throttle':0,
+                'brake':0,
                 'event_triggered': self.control.random_steer_active,
                 'event_value': self.control.random_steer_value if self.control.random_steer_active else 0
             }
@@ -130,7 +132,6 @@ class Main_Car_Control:
         pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
         while self.flag:
             current_time = time.time()
-            self.speed_limit = road_speed_limit[env_map.get_waypoint(self.vehicle.get_location()).lane_id]
             if self.autopilot_flag:
                 drive_status = "自动驾驶"
                 if keyboard.is_pressed("q"):

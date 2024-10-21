@@ -2,7 +2,7 @@ import threading
 import carla
 import pygame
 from disposition import *
-from s04_config import *
+from s04_config_traffic import *
 import random
 import csv
 import time
