@@ -99,14 +99,14 @@ class DataRecorder(object):
             'gear', 'collision', 'lane_invasion'
         ])
 
-    def record(self, world, collision_history, lane_invasion_text):
+    def record(self, world, collision, lane_invasion_text):
         player = world.player
         t = player.get_transform()
         v = player.get_velocity()
         c = player.get_control()
         speed = 3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)  # Convert m/s to km/h
         # Simplified collision and lane invasion recording
-        collision_intensity = sum(collision_history.values())
+        collision_intensity = collision
         current_time = time.time()
         # Write data to CSV
         self.writer.writerow([
@@ -173,7 +173,7 @@ class World(object):
 
     def tick(self, clock):
         self.hud.tick(self, clock)
-        collision_intensity = self.collision_sensor.get_collision_history()
+        collision_intensity = self.collision_sensor.get_collision_intensity()
         lane_invasion_text = 'x'
         self.data_recorder.record(self, collision_intensity, lane_invasion_text)
 
@@ -543,13 +543,17 @@ class CollisionSensor(object):
         # reference.
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
+        self.latest_intensity = 0
 
     def get_collision_history(self):
         history = collections.defaultdict(int)
         for frame, intensity in self.history:
             history[frame] += intensity
         return history
-
+    
+    def get_collision_intensity(self):
+        return self.latest_intensity
+    
     @staticmethod
     def _on_collision(weak_self, event):
         self = weak_self()
@@ -559,6 +563,7 @@ class CollisionSensor(object):
         self.hud.notification('Collision with %r' % actor_type)
         impulse = event.normal_impulse
         intensity = math.sqrt(impulse.x**2 + impulse.y**2 + impulse.z**2)
+        self.latest_intensity = intensity
         self.history.append((event.frame, intensity))
         if len(self.history) > 4000:
             self.history.pop(0)
