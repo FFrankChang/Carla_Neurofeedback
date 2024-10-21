@@ -25,6 +25,8 @@ import math
 import random
 import re
 import weakref
+import csv
+import time
 
 if sys.version_info >= (3, 0):
 
@@ -81,6 +83,40 @@ def get_actor_display_name(actor, truncate=250):
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
+# ==============================================================================
+# -- DataRecoder ---------------------------------------------------------------------
+# ==============================================================================
+
+
+class DataRecorder(object):
+    def __init__(self, filename='vehicle_data.csv'):
+        # Open a CSV file for writing
+        self.file = open(filename, 'w', newline='')
+        self.writer = csv.writer(self.file)
+        # Write the header row
+        self.writer.writerow([
+            'timestamp', 'x', 'y', 'z', 'speed', 'throttle', 'steer', 'brake', 'hand_brake', 'reverse',
+            'gear', 'collision', 'lane_invasion'
+        ])
+
+    def record(self, world, collision_history, lane_invasion_text):
+        player = world.player
+        t = player.get_transform()
+        v = player.get_velocity()
+        c = player.get_control()
+        speed = 3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)  # Convert m/s to km/h
+        # Simplified collision and lane invasion recording
+        collision_intensity = sum(collision_history.values())
+        current_time = time.time()
+        # Write data to CSV
+        self.writer.writerow([
+            current_time, t.location.x, t.location.y, t.location.z,
+            speed, c.throttle, c.steer, c.brake, c.hand_brake, c.reverse,
+            c.gear, collision_intensity, lane_invasion_text
+        ])
+
+    def close(self):
+        self.file.close()
 
 # ==============================================================================
 # -- World ---------------------------------------------------------------------
@@ -100,6 +136,7 @@ class World(object):
         self._actor_filter = actor_filter
         self.restart()
         self.world.on_tick(hud.on_world_tick)
+        self.data_recorder = DataRecorder()  
 
     def restart(self):
         # Keep same camera config if the camera manager exists.
@@ -136,6 +173,9 @@ class World(object):
 
     def tick(self, clock):
         self.hud.tick(self, clock)
+        collision_intensity = self.collision_sensor.get_collision_history()
+        lane_invasion_text = 'x'
+        self.data_recorder.record(self, collision_intensity, lane_invasion_text)
 
     def render(self, display):
         self.camera_manager.render(display)
@@ -595,15 +635,7 @@ class CameraManager(object):
             carla.Transform(carla.Location(x=-5.5, z=2.8), carla.Rotation(pitch=-15)),
             carla.Transform(carla.Location(x=1.6, z=1.7))]
         self.transform_index = 1
-        self.sensors = [
-            ['sensor.camera.rgb', cc.Raw, 'Camera RGB'],
-            ['sensor.camera.depth', cc.Raw, 'Camera Depth (Raw)'],
-            ['sensor.camera.depth', cc.Depth, 'Camera Depth (Gray Scale)'],
-            ['sensor.camera.depth', cc.LogarithmicDepth, 'Camera Depth (Logarithmic Gray Scale)'],
-            ['sensor.camera.semantic_segmentation', cc.Raw, 'Camera Semantic Segmentation (Raw)'],
-            ['sensor.camera.semantic_segmentation', cc.CityScapesPalette,
-                'Camera Semantic Segmentation (CityScapes Palette)'],
-            ['sensor.lidar.ray_cast', None, 'Lidar (Ray-Cast)']]
+        self.sensors = [['sensor.camera.rgb', cc.Raw, 'Camera RGB']]
         world = self._parent.get_world()
         bp_library = world.get_blueprint_library()
         for item in self.sensors:
