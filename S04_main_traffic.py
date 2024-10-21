@@ -2,7 +2,7 @@ import threading
 import carla
 import pygame
 from disposition import *
-from s01_config import *
+from s04_config import *
 import random
 import csv
 import time
@@ -24,10 +24,11 @@ class Vehicle_Traffic:
 
         # Traffic Manager
         self.tm = client.get_trafficmanager(tm_port)  # 默认Traffic Manager端口8000
-        self.tm.set_global_distance_to_leading_vehicle(2.5)  # 设置全局安全距离
+        print(self.tm)
         self.tm.set_synchronous_mode(True)  # 如果使用同步模式
+        self.tm.global_percentage_speed_difference(-270)
 
-    def create_vehicle(self, points=None, number=1, vehicle_model=None, height=0.05):
+    def create_vehicle(self, points=None,  vehicle_model=None):
         vehicles = []
         if vehicle_model:
             blueprint_car = self.blueprint_library.filter('*vehicle*')
@@ -46,7 +47,24 @@ class Vehicle_Traffic:
             else:
                 print(f"索引为：{index}的车子未成功生成！")
         return vehicles
+    
+    def create_main_vehicle(self, points=None, vehicle_model=None):
+        vehicles = []
+        if vehicle_model:
+            blueprint_car = self.blueprint_library.filter('*vehicle*')
+            cars = [bp for bp in blueprint_car if vehicle_model in bp.id.lower()]
+        else:
+            cars = self.blueprint_library.filter('*crown*')
 
+        for index, point in enumerate(points):
+            waypoint = self.env_map.get_waypoint(point)  
+            transform = carla.Transform(point, waypoint.transform.rotation)
+            vehicle = self.world.try_spawn_actor(random.choice(cars), transform)
+            if vehicle:
+                vehicles.append(vehicle)
+            else:
+                print(f"索引为：{index}的车子未成功生成！")
+        return vehicles
 # 主车控制器
 class Main_Car_Control:
     def __init__(self, main_car, world, instantaneous_speed=False):
@@ -63,7 +81,7 @@ class Main_Car_Control:
         self.speed_limit = 100  
         self.flag = True
         self.lead_vehicle = None
-        self.next_event_time = time.time() + 6
+        self.next_event_time = time.time() + 30
         self.steer_duration = 0  
         self.steer_event_end_time = 0  
         self.random_steer_active = False
@@ -71,11 +89,10 @@ class Main_Car_Control:
         self.steer = 0
 
     def follow_road(self):
-        global drive_status, scene_status
+        global drive_status
         self.flag = True
         pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
         while self.flag:
-            self.speed_limit = road_speed_limit[self.world.get_map().get_waypoint(self.vehicle.get_location()).lane_id]
             drive_status = "人工驾驶"
             steer, throttle, brake = get_steering_wheel_info()
             self.steer = steer
@@ -178,32 +195,59 @@ def get_steering_wheel_info():
     return joystick.get_axis(0), (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
 
 # 场景
-def scene_jian(vehicle, main_car_control, end_location):  # 简单场景
+def scene_jian( main_car_control, end_location):  # 简单场景
     global scene_status, vices_car_list
     threading.Thread(target=main_car_control.follow_road).start()  # 启动主车
     scene_status = "简单场景"
 
 
+def generate_random_locations_around_vehicle(base_location, num_vehicles=100, x_range=(-100, 100), y_range=(-50, 50), z=5, min_distance=5, safe_zone_radius=5):
+    random_locations = []
+    base_x, base_y, base_z = base_location.x, base_location.y, base_location.z
+    
+    while len(random_locations) < num_vehicles:
+        random_x = base_x + random.uniform(*x_range)
+        random_y = base_y + random.uniform(*y_range)
+        valid_location = True
+
+        # Check if the new location is within the safe zone around the base vehicle
+        if ((base_x - random_x) ** 2 + (base_y - random_y) ** 2) ** 0.5 < safe_zone_radius:
+            continue
+        
+        # Check if new location is too close to any existing location
+        for location in random_locations:
+            if ((location.x - random_x) ** 2 + (location.y - random_y) ** 2) ** 0.5 < min_distance:
+                valid_location = False
+                break
+        
+        if valid_location:
+            random_locations.append(carla.Location(x=random_x, y=random_y, z=z))
+    
+    return random_locations
+
 if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  # 销毁所有车辆
+    random_traffic_points = generate_random_locations_around_vehicle(
+        easy_location1, 
+        num_vehicles=100, 
+        x_range=(-100, 500),  
+        y_range=(-12.5, 12.5),    
+        z=5        
+    )
 
     vehicle_traffic = Vehicle_Traffic(world)  # 车辆创建对象
     # 创建主车
-    vehicle = vehicle_traffic.create_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]
-    random_location1 =  carla.Location(x=5606.206055, y=3001.875000, z=15.142560)
-    random_location2 =  carla.Location(x=5576.206055, y=3005.875000, z=15.142560)
-    random_location3 =  carla.Location(x=5536.206055, y=3001.875000, z=15.142560)
-    # 创建随机交通流车辆
-    random_traffic_points = [random_location1, random_location2, random_location3]  # 定义多个随机地点
-    random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points, number=3)
+    vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]
+
+    random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
     
     # 创建窗口
     window = Window(world, vehicle_traffic.blueprint_library, vehicle)
     main_car_control = Main_Car_Control(vehicle, world, True)
     
     # 启动简单场景
-    scene_jian(vehicle, main_car_control, interfere_one_location1)
+    scene_jian(main_car_control, interfere_one_location1)
     
     while True:
         world.tick()  # 确保同步更新
-        time.sleep(0.05)
+        time.sleep(0.01)
