@@ -12,6 +12,54 @@ vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  
 scene_status = "简单场景"  
 
+class DataRecorder(threading.Thread):
+    def __init__(self, control_instance, interval=0.1):
+        super().__init__()
+        self.control = control_instance
+        self.interval = interval
+        self.fields = ['timestamp', 'vehicle_x', 'vehicle_y', 'steer', 'throttle', 'brake', 'event_triggered', 'event_value']
+        self.running = True
+        self.filename = self.setup_filename()
+        self.setup_file()
+
+    def setup_filename(self):
+        directory = './data'
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        date_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return os.path.join(directory, f'C04_traffic_{date_time}.csv')
+
+    def setup_file(self):
+        with open(self.filename, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=self.fields)
+            writer.writeheader()
+
+    def run(self):
+        while self.running:
+            current_time = time.time()
+            vehicle = self.control.vehicle
+            data = {
+                'timestamp': current_time,
+                'vehicle_x': vehicle.get_location().x,
+                'vehicle_y': vehicle.get_location().y,
+                'steer': self.control.steer,
+                'throttle': self.control.throttle,
+                'brake': self.control.brake,
+                'event_triggered': self.control.random_steer_active,
+                'event_value': self.control.random_steer_value if self.control.random_steer_active else 0
+            }
+            self.record_data(data)
+            time.sleep(self.interval)
+
+    def record_data(self, data):
+        with open(self.filename, 'a', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=self.fields)
+            writer.writerow(data)
+            csvfile.flush()
+            
+    def stop(self):
+        self.running = False
+        self.join()
 
 class Vehicle_Traffic:
     def __init__(self, world, tm_port=8000):
@@ -29,6 +77,14 @@ class Vehicle_Traffic:
         self.tm.global_percentage_speed_difference(-270)
 
     def create_vehicle(self, points=None,  vehicle_model=None):
+            # 定义一个颜色列表
+        colors = [
+            '0,0,0',    
+            '10,10,150',
+            '230,230,0',  
+            '255,165,0', 
+            '255,255,255' 
+        ]
         vehicles = []
         if vehicle_model:
             blueprint_car = self.blueprint_library.filter('*vehicle*')
@@ -37,9 +93,13 @@ class Vehicle_Traffic:
             cars = self.blueprint_library.filter('*crown*')
 
         for index, point in enumerate(points):
+            car_blueprint = random.choice(cars)
+            car_color = random.choice(colors)
+            car_blueprint.set_attribute('color', car_color)
+
             waypoint = self.env_map.get_waypoint(point)  
             transform = carla.Transform(point, waypoint.transform.rotation)
-            vehicle = self.world.try_spawn_actor(random.choice(cars), transform)
+            vehicle = self.world.try_spawn_actor(car_blueprint, transform)
             if vehicle:
                 vehicles.append(vehicle)
                 # 加入Traffic Manager管理的车辆
@@ -87,6 +147,8 @@ class Main_Car_Control:
         self.random_steer_active = False
         self.random_steer_value = 0
         self.steer = 0
+        self.throttle = 0
+        self.brake = 0
 
     def follow_road(self):
         global drive_status
@@ -96,8 +158,29 @@ class Main_Car_Control:
             drive_status = "人工驾驶"
             steer, throttle, brake = get_steering_wheel_info()
             self.steer = steer
+            self.throttle = throttle
+            self.brake = brake
+            current_time = time.time()
+
+            if not self.random_steer_active and current_time >= self.next_event_time:
+                self.trigger_random_steer_event()
+
+            if self.random_steer_active:
+                if current_time <= self.steer_event_end_time:
+                    steer += self.random_steer_value
+                else:
+                    self.random_steer_active = False
+                    self.next_event_time = current_time + random.randint(8, 12)
 
             car_control(self.vehicle, steer, throttle, brake)
+
+    def trigger_random_steer_event(self):
+        """Activate a random steer event."""
+        self.random_steer_active = True
+        self.random_steer_value = random.choice([-0.1, 0.1, -0.05, 0.05])
+        self.steer_duration = random.uniform(0.1, 0.2)
+        self.steer_event_end_time = time.time() + self.steer_duration
+        print(f"Random steer event triggered for {self.steer_duration:.2f} seconds with steer {self.random_steer_value:.2f}!")
 
 class Window:
     def __init__(self, world, blueprint_library, vehicle):
@@ -236,18 +319,17 @@ if __name__ == '__main__':
     )
 
     vehicle_traffic = Vehicle_Traffic(world)  # 车辆创建对象
-    # 创建主车
     vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]
-
     random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
-    
-    # 创建窗口
     window = Window(world, vehicle_traffic.blueprint_library, vehicle)
     main_car_control = Main_Car_Control(vehicle, world, True)
-    
-    # 启动简单场景
+    recorder = DataRecorder(main_car_control)
+    recorder.start()
     scene_jian(main_car_control, interfere_one_location1)
     
-    while True:
-        world.tick()  # 确保同步更新
-        time.sleep(0.01)
+    try:
+        while True:
+            world.tick()  # 确保同步更新
+            time.sleep(0.01)
+    finally:
+        recorder.stop()
