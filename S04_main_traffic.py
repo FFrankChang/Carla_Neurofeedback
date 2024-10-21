@@ -109,7 +109,7 @@ class Window:
         """
         self.world = world
         self.vehicle = vehicle
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
         self.fonts = {} 
         pygame.init()  # 初始化pygame
@@ -124,8 +124,8 @@ class Window:
         self.blueprint_camera = blueprint_library.find('sensor.camera.rgb')  # 选择一个传感器蓝图
         self.blueprint_camera.set_attribute('image_size_x', f'{self.SCREEN_WIDTH}')  # 传感器获得的图片高度
         self.blueprint_camera.set_attribute('image_size_y', f'{self.SCREEN_HEIGHT}')  # 传感器获得的图片宽度
-        self.blueprint_camera.set_attribute('fov', '135')  # 水平方向上能看到的视角度数
-        spawn_point = carla.Transform(carla.Location(x=0.15, y=-0.21, z=1.25), carla.Rotation(pitch=-5, yaw=0, roll=0))  # 传感器相对车子的位置设置
+        self.blueprint_camera.set_attribute('fov', '140')  # 水平方向上能看到的视角度数
+        spawn_point = carla.Transform(carla.Location(x=0.1, y = -0.3, z=1.25), carla.Rotation(pitch=-8, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = self.world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
 
         threading.Thread(target=self.show_screen).start()
@@ -201,7 +201,7 @@ def scene_jian( main_car_control, end_location):  # 简单场景
     scene_status = "简单场景"
 
 
-def generate_random_locations_around_vehicle(base_location, num_vehicles=100, x_range=(-100, 100), y_range=(-50, 50), z=5, min_distance=5, safe_zone_radius=5):
+def generate_random_locations_around_vehicle(base_location, num_vehicles=100, x_range=(-100, 100), y_range=(-50, 50), z=5, min_distance=7, safe_zone_radius=10):
     random_locations = []
     base_x, base_y, base_z = base_location.x, base_location.y, base_location.z
     
@@ -230,7 +230,7 @@ if __name__ == '__main__':
     random_traffic_points = generate_random_locations_around_vehicle(
         easy_location1, 
         num_vehicles=100, 
-        x_range=(-100, 500),  
+        x_range=(-100, 600),  
         y_range=(-12.5, 12.5),    
         z=5        
     )
