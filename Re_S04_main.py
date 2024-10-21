@@ -83,10 +83,12 @@ def get_actor_display_name(actor, truncate=250):
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
+global current_speed
+current_speed = 0
+
 # ==============================================================================
 # -- DataRecoder ---------------------------------------------------------------------
 # ==============================================================================
-
 
 class DataRecorder(object):
     def __init__(self):
@@ -141,6 +143,30 @@ class DataRecorder(object):
 
     def close(self):
         self.file.close()
+
+class PIDController:
+    def __init__(self, kp, ki, kd, min_output, max_output):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.min_output = min_output
+        self.max_output = max_output
+        self.integral = 0
+        self.last_error = 0
+
+    def reset(self):
+        self.integral = 0
+        self.last_error = 0
+
+    def control(self, setpoint, measured_value, dt):
+        error = setpoint - measured_value
+        self.integral += error * dt
+        derivative = (error - self.last_error) / dt
+        output = (self.kp * error) + (self.ki * self.integral) + (self.kd * derivative)
+        self.last_error = error
+        # Clamp the output
+        output = max(self.min_output, min(self.max_output, output))
+        return output
 
 # ==============================================================================
 # -- World ---------------------------------------------------------------------
@@ -254,6 +280,8 @@ class DualControl(object):
         self._brake_idx = 2
         self._reverse_idx = 5
         self._handbrake_idx = 4
+        self.speed_controller = PIDController(kp=0.8, ki=0, kd=0, min_output=0, max_output=1)
+
 
     def parse_events(self, world, clock):
         for event in pygame.event.get():
@@ -343,6 +371,11 @@ class DualControl(object):
         K2 = 1.6  # 1.6
         throttleCmd = K2 + (2.05 * math.log10(
             -0.7 * jsInputs[self._throttle_idx] + 1.4) - 1.2) / 0.92
+        
+        # global current_speed
+        # dt = 0.5  
+        # throttleCmd = self.speed_controller.control(80, current_speed, dt)
+
         if throttleCmd <= 0:
             throttleCmd = 0
         elif throttleCmd > 1:
@@ -420,6 +453,8 @@ class HUD(object):
         t = world.player.get_transform()
         v = world.player.get_velocity()
         c = world.player.get_control()
+        global current_speed
+        current_speed =  (3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2))
         heading = 'N' if abs(t.rotation.yaw) < 89.5 else ''
         heading += 'S' if abs(t.rotation.yaw) > 90.5 else ''
         heading += 'E' if 179.5 > t.rotation.yaw > 0.5 else ''
