@@ -89,31 +89,55 @@ def get_actor_display_name(actor, truncate=250):
 
 
 class DataRecorder(object):
-    def __init__(self, filename='vehicle_data.csv'):
-        # Open a CSV file for writing
-        self.file = open(filename, 'w', newline='')
-        self.writer = csv.writer(self.file)
-        # Write the header row
-        self.writer.writerow([
-            'timestamp', 'x', 'y', 'z', 'speed', 'throttle', 'steer', 'brake', 'hand_brake', 'reverse',
-            'gear', 'collision', 'lane_invasion'
-        ])
+    def __init__(self):
 
-    def record(self, world, collision, lane_invasion_text):
+        self.fields = [
+            'timestamp', 'x', 'y', 'z', 'speed', 'throttle', 'steer', 'brake',
+            'hand_brake', 'reverse', 'gear', 'collision_intensity', 'lane_invasion'
+        ]
+        self.filename = self.setup_filename()
+        self.file = self.setup_file()
+
+    def setup_filename(self):
+        directory = r'E:\Frank_Projects\Carla_Neurofeedback_Frank\data'
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        date_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        return os.path.join(directory, f'C04_{date_time}.csv')
+
+    def setup_file(self):
+        # Open the file for writing, save the file object
+        file = open(self.filename, 'w', newline='')
+        self.writer = csv.DictWriter(file, fieldnames=self.fields)
+        self.writer.writeheader()
+        return file
+
+    def record(self, world, collision_intensity, lane_invasion_text):
+        # Data collection
         player = world.player
         t = player.get_transform()
         v = player.get_velocity()
         c = player.get_control()
         speed = 3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)  # Convert m/s to km/h
-        # Simplified collision and lane invasion recording
-        collision_intensity = collision
         current_time = time.time()
-        # Write data to CSV
-        self.writer.writerow([
-            current_time, t.location.x, t.location.y, t.location.z,
-            speed, c.throttle, c.steer, c.brake, c.hand_brake, c.reverse,
-            c.gear, collision_intensity, lane_invasion_text
-        ])
+        data = {
+            'timestamp': current_time,
+            'x': t.location.x,
+            'y': t.location.y,
+            'z': t.location.z,
+            'speed': speed,
+            'throttle': c.throttle,
+            'steer': c.steer,
+            'brake': c.brake,
+            'hand_brake': c.hand_brake,
+            'reverse': c.reverse,
+            'gear': c.gear,
+            'collision_intensity': collision_intensity,
+            'lane_invasion': lane_invasion_text
+        }
+        # Write data using the stored file object
+        writer = csv.DictWriter(self.file, fieldnames=self.fields)
+        writer.writerow(data)
 
     def close(self):
         self.file.close()
