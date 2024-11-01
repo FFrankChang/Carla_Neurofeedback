@@ -16,7 +16,7 @@ scene_status = "简单场景"
 
 
 class DataRecorder(threading.Thread):
-    def __init__(self, control_instance, interval=0.1):
+    def __init__(self, control_instance, interval=0.01):
         super().__init__()
         self.control = control_instance
         self.interval = interval
@@ -51,7 +51,7 @@ class DataRecorder(threading.Thread):
                 'event_triggered': self.control.random_steer_active,
                 'event_value': self.control.random_steer_value if self.control.random_steer_active else 0
             }
-            self.record_data(data)
+            self.record_data(data) 
             time.sleep(self.interval)
 
     def record_data(self, data):

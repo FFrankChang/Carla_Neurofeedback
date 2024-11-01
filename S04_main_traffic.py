@@ -13,7 +13,7 @@ drive_status = "自动驾驶"
 scene_status = "简单场景"  
 
 class DataRecorder(threading.Thread):
-    def __init__(self, control_instance, interval=0.1):
+    def __init__(self, control_instance, interval=0.01):
         super().__init__()
         self.control = control_instance
         self.interval = interval
