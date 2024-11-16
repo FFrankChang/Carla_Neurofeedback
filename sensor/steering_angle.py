@@ -1,11 +1,23 @@
 import socket
 import struct
+import threading
 
-steering_wheel_angle = 0
+_steering_wheel_angle = 0
+angle_lock = threading.Lock()  # 添加一个线程锁
 
 udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-local_address = ('localhost', 9763)
+local_address = ('192.168.31.95', 9763)
 udp_socket.bind(local_address)
+
+def get_steering_angle():
+    with angle_lock:
+        return _steering_wheel_angle
+    
+def set_steering_angle(angle):
+    with angle_lock:
+        global _steering_wheel_angle
+        _steering_wheel_angle = angle
+
 
 def parse_euler():
     calibration_frames = 10
@@ -35,7 +47,6 @@ def parse_euler():
             segment_body.append(pos)
             segment_body.append(ori)
             body.append(segment_body)
-        
         current_angle = body[23][2][2] 
 
         if len(calibration_values) < calibration_frames:
@@ -51,14 +62,14 @@ def parse_euler():
                 total_rotation -= 360
             elif angle_delta < -180:
                 total_rotation += 360
-        
         last_angle = adjusted_angle
+
         steering_wheel_angle = total_rotation + adjusted_angle
         if steering_wheel_angle > 540:
             steering_wheel_angle -= 1080
         elif steering_wheel_angle < -540:
             steering_wheel_angle += 1080
 
-        print(f"Steering Wheel Angle: {steering_wheel_angle:.2f}")
+        set_steering_angle(steering_wheel_angle) 
+        # print(f"Steering Wheel Angle: {steering_wheel_angle:.2f}")
 
-parse_euler()
