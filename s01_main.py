@@ -21,6 +21,15 @@ volume_size=0.5  # 音量大小
 global last_steer 
 last_steer =0
 
+def get_user_input(prompt, default_value):
+    try:
+        # 获取用户输入，如果未输入则使用默认值
+        value = input(prompt)
+        return int(value) if value else default_value
+    except ValueError:
+        print("输入无效，请输入一个整数。")
+        return default_value
+
 def find_weather_presets():
     rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
     name = lambda x: ' '.join(m.group(0) for m in rgx.finditer(x))
@@ -189,7 +198,7 @@ class Main_Car_Control:
         self.road_id = 4  # 主车所在道路id
         self.speed_limit = 100  # 主车速度限制
         self.flag = True
-        self.udp_ip = "127.0.0.1"  # IP of the destination computer
+        self.udp_ip = "192.168.3.6"  # IP of the destination computer
         self.udp_port = 12346  # Port number on the destination computer
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP socket
 
@@ -533,7 +542,7 @@ class Window:
         """
         self.world = world
         self.vehicle = vehicle
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
         self.collision_detected = False  # 添加此行来追踪碰撞状态
 
         # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
@@ -553,6 +562,8 @@ class Window:
         self.blueprint_camera.set_attribute('image_size_y', f'{self.SCREEN_HEIGHT}')  # 传感器获得的图片宽度
         self.blueprint_camera.set_attribute('fov', '145')  # 水平方向上能看到的视角度数
         spawn_point = carla.Transform(carla.Location(x=0.15, y = -0.21, z=1.15), carla.Rotation(pitch=7, yaw=0, roll=0))  # 传感器相对车子的位置设置
+        # spawn_point = carla.Transform(carla.Location( x=1.5, y = -0.35, z= 1.4 ), carla.Rotation(pitch=10, yaw=0, roll=0))  
+        # 传感器相对车子的位置设置(X值越大，越靠前；y值越小，越靠左；z值越大，越靠上)
         self.sensor = self.world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
 
         threading.Thread(target=self.show_screen).start()
@@ -683,8 +694,23 @@ def create_vices(vehicle_traffic, vehicle):
     vehicle_location = vehicle.get_location()  # 主车坐标
     number = 5 # 每个方向生成的车辆数
     max_offset = 5  # 最大偏移量
-    ahead_distance = 40
-    back_distance = 30
+
+    # 提供选项给用户选择
+    print("请选择前后生成车辆的距离（单位：米）：")
+    print("1. 20米")
+    print("2. 30米")
+    print("3. 40米")
+
+    # 根据用户选择设置值，默认值为40
+    distance = get_user_input("请输入距离（默认为40米）：", 40)
+
+    # 设置前方和后方距离相等
+    ahead_distance = back_distance = distance
+
+    # 输出确认
+    print(f"已设置前后车辆生成距离为：{ahead_distance}米")
+
+
     # 创建前方的车流
     for i in range(number):
         # 为每排车辆随机生成一个偏移量
@@ -967,7 +993,7 @@ def scene_jian(vehicle, main_car_control, vice_car_control, end_location):  # �
 
     scene_status = "等待36s开始"  # 36s
     t = time.time()
-    time_gap = 36
+    time_gap = 1
     while time.time() - t < time_gap:
         scene_status = f"倒计时{int(time_gap - (time.time() - t))}s (简单场景)"
         # print(f"经历了{int(time.time() - t)}s了")
@@ -1042,6 +1068,32 @@ def handle_collision(event, window,data_recorder):
     window.collision_detected = True  # 设置窗口类中的碰撞标志
 
 if __name__ == '__main__':
+
+    # 用户输入速度挡位
+    print("请选择车道速度挡位：")
+    print("1. 60 km/h")
+    print("2. 90 km/h")
+    print("3. 120 km/h")
+
+    speed_option = get_user_input("请输入速度挡位（默认 60 km/h）：", 60)
+    if speed_option == 1:
+        selected_speed = 60
+    elif speed_option == 2:
+        selected_speed = 90
+    elif speed_option == 3:
+        selected_speed = 120
+    else:
+        selected_speed = 60
+
+    # 更新 s01_config 中的速度限制
+    for lane_id in road_speed_limit:
+        road_speed_limit[lane_id] = selected_speed
+        
+
+    # 输出确认
+    print(f"所有车道速度已设置为：{selected_speed} km/h")
+
+    # 初始化实验参数
     subject_id = "SUBJECT" if len(sys.argv) < 2 else sys.argv[1]
     date = "DAY" if len(sys.argv) < 3 else sys.argv[2]
     condition = "CONDITION" if len(sys.argv) < 4 else sys.argv[3]
@@ -1071,3 +1123,4 @@ if __name__ == '__main__':
     # 简单场景
     while True:
         sleep(1)
+
