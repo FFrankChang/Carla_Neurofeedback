@@ -8,7 +8,7 @@ import csv
 import time 
 from datetime import datetime
 from sensor.steering_angle import parse_euler, get_steering_angle
-
+from sensor.pedal import get_data,pedal_receiver
 
 vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  
@@ -108,7 +108,7 @@ class Main_Car_Control:
                 drive_status = "人工驾驶"
                 if keyboard.is_pressed("e"):  
                     self.autopilot_flag = True
-                steer, throttle, brake = get_steering_wheel_info()
+                steer, throttle, brake = get_sensor_data()
                 self.steer = steer
                 car_control(self.vehicle, steer, throttle, brake)
                 # set_speed(self.vehicle, 80)
@@ -125,7 +125,7 @@ class Window:
         """
         self.world = world
         self.vehicle = vehicle
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  # 屏幕大小
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  # 屏幕大小
         self.screen = None  # 初始化屏幕窗口
         pygame.init()  # 初始化pygame
 
@@ -235,15 +235,16 @@ def set_speed(vehicle, speed_kmh):
 
 
 # 获取方向盘信息
-def get_steering_wheel_info():
+def get_sensor_data():
     """
     return: 方向盘、油门、刹车
     """
     K1 = 0.35
     steer = round(get_steering_angle()/ 450,3)
     steerCmd = K1 * math.tan(1.1 * steer)
-    print(steerCmd)
-    return  steerCmd, 0, 0
+    # print(steerCmd)
+    acc,brake = get_data()
+    return  steerCmd, acc, 0
 
 
 def destroy_lose_vehicle(main_car):  # 销毁失控车辆
@@ -286,6 +287,7 @@ def scene_jian(vehicle, main_car_control, end_location):
 if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  
     threading.Thread(target=parse_euler).start()
+    threading.Thread(target=pedal_receiver).start()
 
     vehicle_traffic = Vehicle_Traffic(world)  
     vehicle = vehicle_traffic.create_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]  # 创建主车
