@@ -12,15 +12,10 @@ from sensor.pedal import get_data,pedal_receiver
 vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  
 scene_status = "简单场景"  
+system_fault = False
 
 def change_weather(world, gradual_steps=10, duration=10):
-    """
-    Change the weather in the world gradually over time.
-    
-    :param world: CARLA world instance
-    :param gradual_steps: Number of steps to reach the darkest state
-    :param duration: Time in seconds over which to change the weather
-    """
+
     weather = carla.WeatherParameters(
         cloudiness=0.0,
         precipitation=0.0,
@@ -160,13 +155,18 @@ class Main_Car_Control:
             self.steer = steer
             self.throttle = throttle
             self.brake = brake
-            # set_speed(self.vehicle,90)
-            car_control(self.vehicle, steer, throttle, brake)
+            if system_fault:
+                car_control(self.vehicle, steer, 0.8, 0)
+                # set_speed(self.vehicle,90)
+            else:
+                car_control(self.vehicle, steer, throttle, brake)
+
+                # car_control(self.vehicle, steer, throttle, brake)
             if self.collision_occurred:
                 break
 
     def collision_event(self, event):
-        if not self.collision_occurred:  # 确保只处理第一次碰撞
+        if not self.collision_occurred:
             self.collision_occurred = True
             self.collision_time = time.time() - self.start_time
             collision_message = f"Collision! {self.collision_time:.2f} s"
@@ -211,7 +211,7 @@ class Window:
         spawn_point = carla.Transform(carla.Location(x=1.8, y = -0.3, z=1.25), carla.Rotation(pitch=-8, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = self.world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
         self.show_esc = False
-        self.start_show_esc_after = 5
+        self.start_show_esc_after = 15
         self.show_duration = 3
         self.start_time = time.time()
         self.show_esc_time = self.start_time + self.start_show_esc_after
@@ -227,6 +227,9 @@ class Window:
             current_time = time.time()
             if self.show_esc_time <= current_time < self.end_esc_time:
                 self.show_esc = True
+                global system_fault
+                system_fault = True
+
             else:
                 self.show_esc = False
 
@@ -253,7 +256,7 @@ class Window:
             self.draw_text("动力系统故障！", 150, (self.SCREEN_WIDTH // 2 -300, self.SCREEN_HEIGHT // 3), bold=True,color=(255, 0, 0))
 
         if self.collision_info:
-            self.draw_text(self.collision_info, 150, (self.SCREEN_WIDTH // 2 -300, self.SCREEN_HEIGHT // 3), bold=True, color=(255, 0, 0))
+            self.draw_text(self.collision_info, 150, (self.SCREEN_WIDTH // 2 -300, self.SCREEN_HEIGHT // 3), bold=True, color=(255, 255, 255))
 
         pygame.display.flip()
         fps = self.clock.get_fps()
