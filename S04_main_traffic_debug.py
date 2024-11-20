@@ -57,6 +57,13 @@ class Vehicle_Traffic:
                 vehicles.append(vehicle)
                 # 加入Traffic Manager管理的车辆
                 vehicle.set_autopilot(True, self.tm.get_port())
+                self.tm.auto_lane_change(vehicle, False)
+                lights = carla.VehicleLightState.Brake
+                light_front = carla.VehicleLightState.HighBeam
+                # print(lights)
+                vehicle.set_light_state(carla.VehicleLightState(lights))
+                vehicle.set_light_state(carla.VehicleLightState(light_front))
+
             else:
                 print(f"索引为：{index}的车子未成功生成！")
         return vehicles
@@ -75,6 +82,9 @@ class Vehicle_Traffic:
             vehicle = self.world.try_spawn_actor(random.choice(cars), transform)
             if vehicle:
                 vehicles.append(vehicle)
+                light_front = carla.VehicleLightState.HighBeam
+                vehicle.set_light_state(carla.VehicleLightState(light_front))
+
             else:
                 print(f"索引为：{index}的车子未成功生成！")
         return vehicles
@@ -197,14 +207,14 @@ def destroy_all_vehicles_traffics(world, vehicle_flag=True, traffic_flag=True):
 def get_sensor_data():
     """
     return: 方向盘、油门、刹车
-    """
-    K1 = 0.35
-    steer = round(get_steering_angle()/ 450,3)
-    steerCmd = K1 * math.tan(1.1 * steer)
-    # print(steerCmd)
-    acc,brake = get_data()
-    return  steerCmd, acc, brake
-
+    # """
+    # K1 = 0.35
+    # steer = round(get_steering_angle()/ 450,3)
+    # steerCmd = K1 * math.tan(1.1 * steer)
+    # # print(steerCmd)
+    # acc,brake = get_data()
+    # return  steerCmd, acc, brake
+    return 0,0,0
 # 场景
 def scene_jian( main_car_control, end_location):  # 简单场景
     global scene_status, vices_car_list
@@ -238,19 +248,19 @@ def generate_random_locations_around_vehicle(base_location, num_vehicles=100, x_
 
 if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  # 销毁所有车辆
-    threading.Thread(target=parse_euler).start()
-    threading.Thread(target=pedal_receiver).start()
+    # threading.Thread(target=parse_euler).start()
+    # threading.Thread(target=pedal_receiver).start()
 
     random_traffic_points = generate_random_locations_around_vehicle(
         easy_location1, 
-        num_vehicles=10, 
+        num_vehicles=100, 
         x_range=(-100, 600),  
         y_range=(-12.5, 12.5),    
-        z=5        
+        z=3        
     )
 
     vehicle_traffic = Vehicle_Traffic(world)  
-    vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]
+    vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.tesla.model3")[0]
     random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
     window = Window(world, vehicle_traffic.blueprint_library, vehicle)
     main_car_control = Main_Car_Control(vehicle, world, True)
