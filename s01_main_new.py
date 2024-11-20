@@ -8,6 +8,7 @@ import random
 import csv
 from datetime import datetime 
 import sys  
+import re
 from sensor.steering_angle import parse_euler, get_steering_angle
 # from sensor.pedal import get_data,pedal_receiver
 
@@ -21,7 +22,23 @@ volume_size=0.5  # 音量大小
 global last_steer 
 last_steer =0
 
+def find_weather_presets():
+    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
+    name = lambda x: ' '.join(m.group(0) for m in rgx.finditer(x))
+    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
+    return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
+class WeatherController:
+    def __init__(self, world):
+        self.world = world
+        self.weather_options = find_weather_presets()
+        self.current_weather = 0  # 默认天气
+        # 设置特定天气为Cloudy Noon
+        for i, (_, weather_name) in enumerate(self.weather_options):
+            if weather_name == "Cloudy Night":
+                self.current_weather = i
+                break
+        self.world.set_weather(self.weather_options[self.current_weather][0])
 class DataRecorder:
     def __init__(self,subject,date,condition,frequency=100):
         self.last_record_time = time.time()
@@ -874,19 +891,24 @@ def set_speed(vehicle, speed_kmh):
 
 # 获取方向盘信息
 
-def get_steering_wheel_info():
-    """
-    return: 方向盘、油门、刹车
-    """
-    K1 = 0.55
-    steer = round(get_steering_angle()/ 450,3)
-    steerCmd = K1 * math.tan(1.1 * steer)
-    # print(steerCmd)
-    # acc,brake = get_data()
-    acc = 0
-    brake = 0
-    return  steerCmd, acc, brake
+# def get_steering_wheel_info():
+#     """
+#     return: 方向盘、油门、刹车
+#     """
+#     K1 = 0.55
+#     steer = round(get_steering_angle()/ 450,3)
+#     steerCmd = K1 * math.tan(1.1 * steer)
+#     # print(steerCmd)
+#     # acc,brake = get_data()
+#     return  steerCmd, acc, brake
 
+def get_steering_wheel_info():
+    steering = joystick.get_axis(0)
+    throttle = joystick.get_axis(1)
+    brake = joystick.get_axis(2)
+    adjusted_throttle = (-throttle + 1) / 2
+    adjusted_brake = (-brake + 1) / 2
+    return steering, adjusted_throttle, adjusted_brake
 
 def destroy_lose_vehicle(main_car):  
     global vices_car_list
@@ -1037,7 +1059,7 @@ if __name__ == '__main__':
 
     args_lateral_dict = {'K_P': 1.95, 'K_D': 0.2, 'K_I': 0.07, 'dt': 1.0 / 10.0}
     args_long_dict = {'K_P': 1, 'K_D': 0.0, 'K_I': 0.75, 'dt': 1.0 / 10.0}
-    threading.Thread(target=parse_euler).start()
+    # threading.Thread(target=parse_euler).start()
     # threading.Thread(target=pedal_receiver).start()
 
     destroy_all_vehicles_traffics(world)  # 销毁所有车辆
@@ -1051,7 +1073,7 @@ if __name__ == '__main__':
                 end_location4])  # 划线
     vehicle_traffic = Vehicle_Traffic(world)  # 车辆创建对象
     vehicle = vehicle_traffic.create_vehicle([easy_location1], vehicle_model="vehicle.lincoln.mkz_2020")[0]  # 创建主车
-
+    weather_controller = WeatherController(world)
     destroy_lose_vehicle(vehicle)  # 销毁失控车辆线程启动
     window = Window(world, blueprint_library, vehicle)  # 创建窗口
     collision_sensor = attach_collision_sensor(vehicle, world, window, data_recorder)
