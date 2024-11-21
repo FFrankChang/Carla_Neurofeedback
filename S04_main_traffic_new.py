@@ -8,6 +8,9 @@ import time
 from datetime import datetime
 from sensor.steering_angle import parse_euler, get_steering_angle
 from sensor.pedal import get_data,pedal_receiver
+import numpy as np
+import math
+from pygame.locals import *
 
 vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  
@@ -46,7 +49,6 @@ class Vehicle_Traffic:
 
         # Traffic Manager
         self.tm = client.get_trafficmanager(tm_port)  # 默认Traffic Manager端口8000
-        print(self.tm)
         self.tm.set_synchronous_mode(True)  # 如果使用同步模式
         self.tm.global_percentage_speed_difference(-270)
 
@@ -129,7 +131,6 @@ class Main_Car_Control:
         self.world = world
         self.autopilot_flag = False  
         self.speed_limit = 100  
-        self.flag = True
         self.lead_vehicle = None
         self.next_event_time = time.time() + 30
         self.steer_duration = 0  
@@ -147,9 +148,8 @@ class Main_Car_Control:
 
     def follow_road(self):
         global drive_status
-        self.flag = True
-        pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
-        while self.flag and self.running:
+        # pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
+        while self.running:
             drive_status = "人工驾驶"
             steer, throttle, brake = get_sensor_data()
             self.steer = steer
@@ -160,10 +160,11 @@ class Main_Car_Control:
                 # set_speed(self.vehicle,90)
             else:
                 car_control(self.vehicle, steer, throttle, brake)
-
+                print(f"apply {steer},{throttle}")
                 # car_control(self.vehicle, steer, throttle, brake)
             if self.collision_occurred:
                 break
+            time.sleep(0.01)
 
     def collision_event(self, event):
         if not self.collision_occurred:
@@ -190,8 +191,8 @@ class Window:
         """
         self.world = world
         self.vehicle = vehicle
-        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  
+        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  
         self.screen = None  # 初始化屏幕窗口
         self.fonts = {} 
         pygame.init()  # 初始化pygame
@@ -211,7 +212,7 @@ class Window:
         spawn_point = carla.Transform(carla.Location(x=1.8, y = -0.3, z=1.25), carla.Rotation(pitch=-8, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = self.world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
         self.show_esc = False
-        self.start_show_esc_after = 15
+        self.start_show_esc_after = 30
         self.show_duration = 3
         self.start_time = time.time()
         self.show_esc_time = self.start_time + self.start_show_esc_after
@@ -280,9 +281,6 @@ class Window:
         self.collision_info = info
 
 def car_control(vehicle, steer=0, throttle=1, brake=0):
-    steer = round(steer, 3)
-    throttle = round(throttle, 3)
-    brake = round(brake, 3)
     control = carla.VehicleControl(steer=steer, throttle=throttle, brake=brake)
     vehicle.apply_control(control)
 
@@ -302,7 +300,15 @@ def get_sensor_data():
     steerCmd = K1 * math.tan(1.1 * steer)
     return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
 
-# 场景
+# def get_sensor_data():
+    # K1 = 0.55
+    # steer = round(get_steering_angle(),3) 
+    # print(steer)
+    # steerCmd = K1 * math.tan(1.1 * steer)
+    # acc,brake = get_data()
+    # return  steerCmd, acc, brake 
+
+
 def scene_jian( main_car_control, end_location):  # 简单场景
     global scene_status, vices_car_list
     threading.Thread(target=main_car_control.follow_road).start()  # 启动主车
@@ -355,19 +361,11 @@ if __name__ == '__main__':
 
     pygame.init()
     pygame.mixer.init()
-    try:
-        joystick = pygame.joystick.Joystick(0)
-        joystick.init()
-    except Exception as e:
-        print(f"没有外接方向盘{e}")
-    args_lateral_dict = {'K_P': 1.95, 'K_D': 0.2, 'K_I': 0.07, 'dt': 1.0 / 10.0}
-    args_long_dict = {'K_P': 1, 'K_D': 0.0, 'K_I': 0.75, 'dt': 1.0 / 10.0}
-
-    destroy_all_vehicles_traffics(world)  
-
-    # threading.Thread(target=parse_euler).start()
+    joystick = pygame.joystick.Joystick(0)
+    joystick.init()
     # threading.Thread(target=pedal_receiver).start()
 
+    destroy_all_vehicles_traffics(world)  
     random_traffic_points = generate_random_locations_around_vehicle(
         easy_location1, 
         num_vehicles=10, 
@@ -380,6 +378,7 @@ if __name__ == '__main__':
     vehicle_traffic = Vehicle_Traffic(world)  
     vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.tesla.model3")[0]
     random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
+    # threading.Thread(target=parse_euler,daemon=True).start()
 
     window = Window(world, vehicle_traffic.blueprint_library, vehicle)
     main_car_control = Main_Car_Control(vehicle, world, window,True)
