@@ -11,6 +11,7 @@ from datetime import datetime
 import numpy as np
 import math
 from pygame.locals import *
+import os
 
 vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  
@@ -161,7 +162,6 @@ class Main_Car_Control:
             else:
                 car_control(self.vehicle, steer, throttle, brake)
                 print(f"apply {steer},{throttle}")
-                # car_control(self.vehicle, steer, throttle, brake)
             if self.collision_occurred:
                 break
             time.sleep(0.01)
