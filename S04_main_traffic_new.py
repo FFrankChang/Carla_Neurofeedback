@@ -6,8 +6,12 @@ import random
 import csv
 import time
 from datetime import datetime
-from sensor.steering_angle import parse_euler, get_steering_angle
-from sensor.pedal import get_data,pedal_receiver
+# from sensor.steering_angle import parse_euler, get_steering_angle
+# from sensor.pedal import get_data,pedal_receiver
+from pygame.locals import *
+import numpy as np
+import os
+import math
 
 vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  
@@ -148,7 +152,7 @@ class Main_Car_Control:
     def follow_road(self):
         global drive_status
         self.flag = True
-        pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
+        # pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
         while self.flag and self.running:
             drive_status = "人工驾驶"
             steer, throttle, brake = get_sensor_data()
