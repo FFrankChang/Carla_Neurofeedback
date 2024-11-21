@@ -281,6 +281,9 @@ class Window:
         self.collision_info = info
 
 def car_control(vehicle, steer=0, throttle=1, brake=0):
+    steer = round(steer, 3)
+    throttle = round(throttle, 3)
+    brake = round(brake, 3)
     control = carla.VehicleControl(steer=steer, throttle=throttle, brake=brake)
     vehicle.apply_control(control)
 
