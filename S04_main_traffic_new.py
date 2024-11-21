@@ -6,8 +6,8 @@ import random
 import csv
 import time
 from datetime import datetime
-from sensor.steering_angle import parse_euler, get_steering_angle
-from sensor.pedal import get_data,pedal_receiver
+# from sensor.steering_angle import parse_euler, get_steering_angle
+# from sensor.pedal import get_data,pedal_receiver
 import numpy as np
 import math
 from pygame.locals import *
