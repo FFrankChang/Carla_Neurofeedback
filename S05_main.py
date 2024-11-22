@@ -10,7 +10,8 @@ from pygame.locals import *
 import numpy as np
 import os
 import math
-
+from sensor.steering_angle import parse_euler, get_steering_angle
+from sensor.pedal import get_data,pedal_receiver
 drive_status = "自动驾驶"  
 scene_status = "简单场景"  
 system_fault = False
@@ -314,20 +315,20 @@ def destroy_all_vehicles_traffics(world, vehicle_flag=True, traffic_flag=True):
         actor.destroy()
 
 
-def get_sensor_data():
-    K1 = 0.55
-    steer = round(joystick.get_axis(0),3) 
-    steerCmd = K1 * math.tan(1.1 * steer)
-    return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
-
 # def get_sensor_data():
-#     K1 = 0.35
-#     steer = get_steering_angle() / 450
+#     K1 = 0.55
+#     steer = round(joystick.get_axis(0),3) 
 #     steerCmd = K1 * math.tan(1.1 * steer)
-#     acc,brake = get_data()
-#     if acc > 0.1:
-#         brake =0
-#     return  steerCmd, acc, brake 
+#     return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
+
+def get_sensor_data():
+    K1 = 0.5
+    steer = get_steering_angle() / 450
+    steerCmd = K1 * math.tan(1.1 * steer)
+    acc,brake = get_data()
+    if acc > 0.1:
+        brake =0
+    return  steerCmd, acc, brake 
 
 
 def scene_jian( main_car_control):  # 简单场景
@@ -351,11 +352,8 @@ def generate_random_locations_around_vehicle(base_location, num_vehicles=100, x_
         random_y = base_y + random.uniform(*y_range)
         valid_location = True
 
-        # Check if the new location is within the safe zone around the base vehicle
         if ((base_x - random_x) ** 2 + (base_y - random_y) ** 2) ** 0.5 < safe_zone_radius:
             continue
-        
-        # Check if new location is too close to any existing location
         for location in random_locations:
             if ((location.x - random_x) ** 2 + (location.y - random_y) ** 2) ** 0.5 < min_distance:
                 valid_location = False
@@ -380,8 +378,11 @@ if __name__ == '__main__':
     pygame.init()
     pygame.mixer.init()
 
-    joystick = pygame.joystick.Joystick(0)
-    joystick.init()
+    # joystick = pygame.joystick.Joystick(0)
+    # joystick.init()
+
+    threading.Thread(target=pedal_receiver).start()
+    threading.Thread(target=parse_euler,daemon=True).start()
 
 
     destroy_all_vehicles_traffics(world)  
@@ -405,5 +406,5 @@ if __name__ == '__main__':
     scene_jian(main_car_control)
     
     while True:
-        world.tick()  # 确保同步更新
+        world.tick()
         time.sleep(0.01)
