@@ -11,7 +11,6 @@ import numpy as np
 import os
 import math
 
-vices_car_list = []  # 所有副车列表
 drive_status = "自动驾驶"  
 scene_status = "简单场景"  
 system_fault = False
@@ -49,7 +48,7 @@ class Vehicle_Traffic:
         # Traffic Manager
         self.tm = client.get_trafficmanager(tm_port)  # 默认Traffic Manager端口8000
         self.tm.set_synchronous_mode(True)  
-        self.tm.global_percentage_speed_difference(-270)
+        self.tm.global_percentage_speed_difference(-50)
 
     def create_vehicle(self, points=None,  vehicle_model=None):
         colors = [
@@ -153,8 +152,9 @@ class Main_Car_Control:
             self.steer = steer
             self.throttle = throttle
             self.brake = brake
+            self.window.speed = self.get_speed()
             if system_fault:
-                car_control(self.vehicle, steer, 0.85, 0)
+                car_control(self.vehicle, steer, 0.7, 0)
                 # set_speed(self.vehicle,90)
             else:
                 car_control(self.vehicle, steer, throttle, brake)
@@ -170,14 +170,19 @@ class Main_Car_Control:
             collision_message = f"Collision! {self.collision_time:.2f} s"
             self.window.set_collision_info(collision_message)  # 设置窗口中显示的碰撞信息
             print(collision_message)
-            # self.stop_scenario()  # 停止场景
+            self.stop_scenario()  # 停止场景
 
     def stop_scenario(self):
         self.running = False
-        self.world.wait_for_tick()  # 等待当前tick完成
+        self.world.wait_for_tick()  
         for vehicle in self.world.get_actors().filter('vehicle.*'):
             vehicle.apply_control(carla.VehicleControl(hand_brake=True, throttle=0.0))
         print("Scenario paused due to collision.")
+    
+    def get_speed(self):
+        velocity = self.vehicle.get_velocity()
+        speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+        return int(speed * 3.6)
 class Window:
     def __init__(self, world, blueprint_library, vehicle):
         """
@@ -213,7 +218,7 @@ class Window:
         self.start_time = time.time()
         self.show_esc_time = self.start_time + self.start_show_esc_after
         self.end_esc_time = self.show_esc_time + self.show_duration
-
+        self.speed = 0
         threading.Thread(target=self.show_screen).start()
 
     def show_screen(self):
@@ -259,6 +264,7 @@ class Window:
             color=(255, 255, 255)
         )
         self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -550, 90), bold=True,color=(255, 255, 255))
+        self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
 
         if self.show_esc:
             self.draw_text("Vehicle Power System Error!", 100, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3), bold=True,color=(255, 0, 0))
@@ -286,12 +292,12 @@ class Window:
         self.collision_info = info
 
     def draw_progress_bar(self, x, y, width, height, progress, color=(0, 255, 0)):
-        """绘制进度条"""
         pygame.draw.rect(self.screen, (50, 50, 50), (x, y, width, height))  # 背景条
         pygame.draw.rect(self.screen, color, (x, y, int(width * progress), height))  # 前景条
 
 def car_control(vehicle, steer=0, throttle=1, brake=0):
-    steer = round(steer, 3)
+    current_control = vehicle.get_control()
+    steer = round((current_control.steer + steer) * 0.5, 3)
     throttle = round(throttle, 3)
     brake = round(brake, 3)
     control = carla.VehicleControl(steer=steer, throttle=throttle, brake=brake)
@@ -324,8 +330,8 @@ def get_sensor_data():
 #     return  steerCmd, acc, brake 
 
 
-def scene_jian( main_car_control, end_location):  # 简单场景
-    global scene_status, vices_car_list
+def scene_jian( main_car_control):  # 简单场景
+    global scene_status
     threading.Thread(target=main_car_control.follow_road).start()  # 启动主车
     scene_status = "简单场景"
 
@@ -364,15 +370,12 @@ def generate_random_locations_around_vehicle(base_location, num_vehicles=100, x_
 
 if __name__ == '__main__':
     client = carla.Client("127.0.0.1", 2000)  # 连接carla
-    client.set_timeout(60)  # 设置超时
+    client.set_timeout(60)  
     world = client.get_world()  # 获取世界对象
     env_map = world.get_map()  # 获取地图对象
     spectator = world.get_spectator()  # ue4中观察者对象
     blueprint_library = world.get_blueprint_library()  # 获取蓝图，可以拿到可创建的对象
-    vehicle_points = env_map.get_spawn_points()  # 拿到世界中所有可绘制车辆的点坐标
-    # inside_junction = env_map.get_waypoint().is_junction()  # 获取路点的车道信息
-    vehicle_models = blueprint_library.filter('*mini*')  # 拿到所有可绘制的车辆模型
-    prop_model = blueprint_library.filter('*prop*')  # 拿到所有可绘制的交通标志模型
+    prop_model = blueprint_library.filter('*prop*') 
 
     pygame.init()
     pygame.mixer.init()
@@ -381,12 +384,11 @@ if __name__ == '__main__':
     joystick.init()
 
 
-
     destroy_all_vehicles_traffics(world)  
     random_traffic_points = generate_random_locations_around_vehicle(
         easy_location1, 
-        num_vehicles=50, 
-        x_range=(50, 900),  
+        num_vehicles=75, 
+        x_range=(20, 900),  
         y_range=(-12.5, 12.5),    
         z=3        
     )
@@ -400,7 +402,7 @@ if __name__ == '__main__':
     main_car_control = Main_Car_Control(vehicle, world, window,True)
     collision_sensor = vehicle_traffic.attach_collision_sensor(vehicle, main_car_control.collision_event)
 
-    scene_jian(main_car_control, interfere_one_location1)
+    scene_jian(main_car_control)
     
     while True:
         world.tick()  # 确保同步更新
