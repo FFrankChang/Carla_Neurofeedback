@@ -52,11 +52,12 @@ class Vehicle_Traffic:
         self.tm.global_percentage_speed_difference(-270)
 
     def create_vehicle(self, points=None,  vehicle_model=None):
-            # 定义一个颜色列表
         colors = [
-  
-            '255,105,180', 
-
+            '0,0,0',    
+            '10,10,150',
+            '230,230,0',  
+            '255,165,0', 
+            '255,255,255' 
         ]
         vehicles = []
         if vehicle_model:
@@ -248,9 +249,19 @@ class Window:
         i3 = i3[..., ::-1]
         img_surface = pygame.surfarray.make_surface(np.flip(i3, axis=0))
         self.screen.blit(img_surface, (0, 0))  # 绘制图片
+        pro = (time.time() - self.start_time ) / 150
+        self.draw_progress_bar(
+            x=self.SCREEN_WIDTH // 2 - 200,
+            y=100,
+            width=500,
+            height=20,
+            progress= pro,
+            color=(255, 255, 255)
+        )
+        self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -550, 90), bold=True,color=(255, 255, 255))
 
         if self.show_esc:
-            self.draw_text("动力系统故障！", 150, (self.SCREEN_WIDTH // 2 -300, self.SCREEN_HEIGHT // 3), bold=True,color=(255, 0, 0))
+            self.draw_text("Vehicle Power System Error!", 100, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3), bold=True,color=(255, 0, 0))
         if self.collision_info:
             self.draw_text(self.collision_info, 150, (self.SCREEN_WIDTH // 2 -300, self.SCREEN_HEIGHT // 3), bold=True, color=(255, 255, 255))
         pygame.display.flip()
@@ -273,6 +284,11 @@ class Window:
     def set_collision_info(self, info):
 
         self.collision_info = info
+
+    def draw_progress_bar(self, x, y, width, height, progress, color=(0, 255, 0)):
+        """绘制进度条"""
+        pygame.draw.rect(self.screen, (50, 50, 50), (x, y, width, height))  # 背景条
+        pygame.draw.rect(self.screen, color, (x, y, int(width * progress), height))  # 前景条
 
 def car_control(vehicle, steer=0, throttle=1, brake=0):
     steer = round(steer, 3)
