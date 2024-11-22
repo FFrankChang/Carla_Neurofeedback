@@ -6,8 +6,8 @@ import random
 import csv
 import time
 from datetime import datetime
-# from sensor.steering_angle import parse_euler, get_steering_angle
-# from sensor.pedal import get_data,pedal_receiver
+from sensor.steering_angle import parse_euler, get_steering_angle
+from sensor.pedal import get_data,pedal_receiver
 import numpy as np
 import math
 from pygame.locals import *
@@ -50,7 +50,7 @@ class Vehicle_Traffic:
 
         # Traffic Manager
         self.tm = client.get_trafficmanager(tm_port)  # 默认Traffic Manager端口8000
-        self.tm.set_synchronous_mode(True)  # 如果使用同步模式
+        self.tm.set_synchronous_mode(True)  
         self.tm.global_percentage_speed_difference(-270)
 
     def create_vehicle(self, points=None,  vehicle_model=None):
@@ -157,14 +157,14 @@ class Main_Car_Control:
             self.throttle = throttle
             self.brake = brake
             if system_fault:
-                car_control(self.vehicle, steer, 0.8, 0)
+                car_control(self.vehicle, steer, 0.85, 0)
                 # set_speed(self.vehicle,90)
             else:
                 car_control(self.vehicle, steer, throttle, brake)
-                print(f"apply {steer},{throttle}")
+                # car_control(self.vehicle, steer, abs(throttle),0.1)
             if self.collision_occurred:
                 break
-            time.sleep(0.01)
+            # time.sleep(0.01)
 
     def collision_event(self, event):
         if not self.collision_occurred:
@@ -173,7 +173,7 @@ class Main_Car_Control:
             collision_message = f"Collision! {self.collision_time:.2f} s"
             self.window.set_collision_info(collision_message)  # 设置窗口中显示的碰撞信息
             print(collision_message)
-            self.stop_scenario()  # 停止场景
+            # self.stop_scenario()  # 停止场景
 
     def stop_scenario(self):
         self.running = False
@@ -191,8 +191,8 @@ class Window:
         """
         self.world = world
         self.vehicle = vehicle
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  
-        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  
+        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  
         self.screen = None  # 初始化屏幕窗口
         self.fonts = {} 
         pygame.init()  # 初始化pygame
@@ -286,6 +286,7 @@ def car_control(vehicle, steer=0, throttle=1, brake=0):
     brake = round(brake, 3)
     control = carla.VehicleControl(steer=steer, throttle=throttle, brake=brake)
     vehicle.apply_control(control)
+    # print(steer,throttle,brake)
 
 def destroy_all_vehicles_traffics(world, vehicle_flag=True, traffic_flag=True):
     actors = []
@@ -297,19 +298,21 @@ def destroy_all_vehicles_traffics(world, vehicle_flag=True, traffic_flag=True):
         actor.destroy()
 
 
-def get_sensor_data():
-    K1 = 0.55
-    steer = round(joystick.get_axis(0),3) 
-    steerCmd = K1 * math.tan(1.1 * steer)
-    return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
-
 # def get_sensor_data():
-    # K1 = 0.55
-    # steer = round(get_steering_angle(),3) 
-    # print(steer)
-    # steerCmd = K1 * math.tan(1.1 * steer)
-    # acc,brake = get_data()
-    # return  steerCmd, acc, brake 
+#     K1 = 0.55
+#     steer = round(joystick.get_axis(0),3) 
+#     steerCmd = K1 * math.tan(1.1 * steer)
+#     return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
+
+def get_sensor_data():
+    K1 = 0.35
+    steer = get_steering_angle() / 450
+    steerCmd = K1 * math.tan(1.1 * steer)
+    acc,brake = get_data()
+    if acc > 0.1:
+        brake =0
+    # print(steer, acc, brake)
+    return  steerCmd, acc, brake 
 
 
 def scene_jian( main_car_control, end_location):  # 简单场景
@@ -364,24 +367,26 @@ if __name__ == '__main__':
 
     pygame.init()
     pygame.mixer.init()
-    joystick = pygame.joystick.Joystick(0)
-    joystick.init()
-    # threading.Thread(target=pedal_receiver).start()
+
+    # joystick = pygame.joystick.Joystick(0)
+    # joystick.init()
+
+    threading.Thread(target=pedal_receiver).start()
+    threading.Thread(target=parse_euler,daemon=True).start()
 
     destroy_all_vehicles_traffics(world)  
     random_traffic_points = generate_random_locations_around_vehicle(
         easy_location1, 
-        num_vehicles=10, 
-        x_range=(-100, 600),  
+        num_vehicles=50, 
+        x_range=(50, 900),  
         y_range=(-12.5, 12.5),    
         z=3        
     )
-    weather_thread = threading.Thread(target=change_weather, args=(world, 100, 20))
+    weather_thread = threading.Thread(target=change_weather, args=(world, 100, 30))
     weather_thread.start()
     vehicle_traffic = Vehicle_Traffic(world)  
     vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.tesla.model3")[0]
     random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
-    # threading.Thread(target=parse_euler,daemon=True).start()
 
     window = Window(world, vehicle_traffic.blueprint_library, vehicle)
     main_car_control = Main_Car_Control(vehicle, world, window,True)
