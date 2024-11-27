@@ -222,6 +222,7 @@ class Window:
         self.show_esc_time = self.start_time + self.start_show_esc_after
         self.end_esc_time = self.show_esc_time + self.show_duration
         self.speed = 0
+        self.show_png = False
         threading.Thread(target=self.show_screen).start()
 
     def show_screen(self):
@@ -266,11 +267,20 @@ class Window:
             progress= pro,
             color=(255, 255, 255)
         )
-        self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
+        self.esp_png = pygame.image.load(r"C:\Users\Lenovo\Desktop\tongji_shi\Carla_Neurofeedback\resource\esp-1.png") 
+        self.esp_png = pygame.transform.scale(self.esp_png, (60, 60))  
+        self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -200, 90))  # 调整位置
+        self.attention_png = pygame.image.load(r"C:\Users\Lenovo\Desktop\tongji_shi\Carla_Neurofeedback\resource\attention.png")
+        self.attention_png = pygame.transform.scale(self.attention_png, (100, 100))  
+        
+        # self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
         self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
 
         if self.show_esc:
-            self.draw_text("Vehicle Power System Error!", 100, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3), bold=True,color=(255, 0, 0))
+            self.show_png = True
+            self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3), bold=True,color=(255, 0, 0))
+        if self.show_png:
+            self.screen.blit(self.attention_png, (self.SCREEN_WIDTH // 2 -600, 100))  
         if self.collision_info:
             self.draw_text(self.collision_info, 150, (self.SCREEN_WIDTH // 2 -300, self.SCREEN_HEIGHT // 3), bold=True, color=(255, 255, 255))
         pygame.display.flip()
