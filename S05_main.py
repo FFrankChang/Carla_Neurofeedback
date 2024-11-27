@@ -49,7 +49,7 @@ class Vehicle_Traffic:
         # Traffic Manager
         self.tm = client.get_trafficmanager(tm_port)  # 默认Traffic Manager端口8000
         self.tm.set_synchronous_mode(True)  
-        self.tm.global_percentage_speed_difference(-20)
+        self.tm.global_percentage_speed_difference(0)
 
     def create_vehicle(self, points=None,  vehicle_model=None):
         colors = [
@@ -158,7 +158,7 @@ class Main_Car_Control:
             if system_fault:
                 if self.speed >75:
                     car_control(self.vehicle, steer ,0,1)
-                car_control(self.vehicle, steer, 0.55, 0)
+                car_control(self.vehicle, steer, 0.58, 0)
             else:
                 car_control(self.vehicle, steer, throttle, brake)
                 # car_control(self.vehicle, steer, abs(throttle),0.1)
@@ -274,7 +274,7 @@ class Window:
         self.attention_png = pygame.transform.scale(self.attention_png, (100, 100))  
         
         # self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
-        self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
+        # self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
 
         if self.show_esc:
             self.show_png = True
@@ -359,9 +359,13 @@ def generate_random_locations_around_vehicle(base_location, num_vehicles=100, x_
     random_locations = []
     base_x, base_y, base_z = base_location.x, base_location.y, base_location.z
     
+    x_values = np.linspace(x_range[0], x_range[1], num=200)  # 生成等间隔的x值
+    weights = np.linspace(1, 10, num=200)  # 生成权重，随x增大而增大
+    
     while len(random_locations) < num_vehicles:
-        random_x = base_x + random.uniform(*x_range)
+        random_x = np.random.choice(x_values, p=weights/weights.sum())
         random_y = base_y + random.uniform(*y_range)
+
         valid_location = True
 
         if ((base_x - random_x) ** 2 + (base_y - random_y) ** 2) ** 0.5 < safe_zone_radius:
@@ -375,7 +379,6 @@ def generate_random_locations_around_vehicle(base_location, num_vehicles=100, x_
             random_locations.append(carla.Location(x=random_x, y=random_y, z=z))
     
     return random_locations
-
 
 
 if __name__ == '__main__':
@@ -400,7 +403,7 @@ if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  
     random_traffic_points = generate_random_locations_around_vehicle(
         easy_location1, 
-        num_vehicles=100, 
+        num_vehicles=75, 
         x_range=(100, 900),  
         y_range=(-12.5, 12.5),    
         z=3        
