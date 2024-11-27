@@ -1,7 +1,7 @@
 import threading
 import carla
 import pygame
-from s04_config_traffic import *
+from s05_config import *
 import random
 import csv
 import time
@@ -10,8 +10,8 @@ from pygame.locals import *
 import numpy as np
 import os
 import math
-from sensor.steering_angle import parse_euler, get_steering_angle
-from sensor.pedal import get_data,pedal_receiver
+# from sensor.steering_angle import parse_euler, get_steering_angle
+# from sensor.pedal import get_data,pedal_receiver
 drive_status = "自动驾驶"  
 scene_status = "简单场景"  
 system_fault = False
@@ -49,7 +49,7 @@ class Vehicle_Traffic:
         # Traffic Manager
         self.tm = client.get_trafficmanager(tm_port)  # 默认Traffic Manager端口8000
         self.tm.set_synchronous_mode(True)  
-        self.tm.global_percentage_speed_difference(-50)
+        self.tm.global_percentage_speed_difference(-20)
 
     def create_vehicle(self, points=None,  vehicle_model=None):
         colors = [
@@ -153,10 +153,12 @@ class Main_Car_Control:
             self.steer = steer
             self.throttle = throttle
             self.brake = brake
-            self.window.speed = self.get_speed()
+            self.speed = self.get_speed()
+            self.window.speed = self.speed
             if system_fault:
-                car_control(self.vehicle, steer, 0.7, 0)
-                # set_speed(self.vehicle,90)
+                if self.speed >75:
+                    car_control(self.vehicle, steer ,0,1)
+                car_control(self.vehicle, steer, 0.55, 0)
             else:
                 car_control(self.vehicle, steer, throttle, brake)
                 # car_control(self.vehicle, steer, abs(throttle),0.1)
@@ -214,7 +216,7 @@ class Window:
         spawn_point = carla.Transform(carla.Location(x=1.8, y = -0.3, z=1.25), carla.Rotation(pitch=-8, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = self.world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
         self.show_esc = False
-        self.start_show_esc_after = 30
+        self.start_show_esc_after = 10
         self.show_duration = 3
         self.start_time = time.time()
         self.show_esc_time = self.start_time + self.start_show_esc_after
@@ -315,20 +317,20 @@ def destroy_all_vehicles_traffics(world, vehicle_flag=True, traffic_flag=True):
         actor.destroy()
 
 
-# def get_sensor_data():
-#     K1 = 0.55
-#     steer = round(joystick.get_axis(0),3) 
-#     steerCmd = K1 * math.tan(1.1 * steer)
-#     return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
-
 def get_sensor_data():
-    K1 = 0.5
-    steer = get_steering_angle() / 450
+    K1 = 0.55
+    steer = round(joystick.get_axis(0),3) 
     steerCmd = K1 * math.tan(1.1 * steer)
-    acc,brake = get_data()
-    if acc > 0.1:
-        brake =0
-    return  steerCmd, acc, brake 
+    return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
+
+# def get_sensor_data():
+#     K1 = 0.5
+#     steer = get_steering_angle() / 450
+#     steerCmd = K1 * math.tan(1.1 * steer)
+#     acc,brake = get_data()
+#     if acc > 0.1:
+#         brake =0
+#     return  steerCmd, acc, brake 
 
 
 def scene_jian( main_car_control):  # 简单场景
@@ -378,18 +380,18 @@ if __name__ == '__main__':
     pygame.init()
     pygame.mixer.init()
 
-    # joystick = pygame.joystick.Joystick(0)
-    # joystick.init()
+    joystick = pygame.joystick.Joystick(0)
+    joystick.init()
 
-    threading.Thread(target=pedal_receiver).start()
-    threading.Thread(target=parse_euler,daemon=True).start()
+    # threading.Thread(target=pedal_receiver).start()
+    # threading.Thread(target=parse_euler,daemon=True).start()
 
 
     destroy_all_vehicles_traffics(world)  
     random_traffic_points = generate_random_locations_around_vehicle(
         easy_location1, 
-        num_vehicles=75, 
-        x_range=(20, 900),  
+        num_vehicles=100, 
+        x_range=(100, 900),  
         y_range=(-12.5, 12.5),    
         z=3        
     )
