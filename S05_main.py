@@ -264,7 +264,7 @@ class Window:
             progress= pro,
             color=(255, 255, 255)
         )
-        self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -550, 90), bold=True,color=(255, 255, 255))
+        self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
         self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
 
         if self.show_esc:
