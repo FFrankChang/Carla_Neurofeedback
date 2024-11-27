@@ -10,8 +10,8 @@ from pygame.locals import *
 import numpy as np
 import os
 import math
-# from sensor.steering_angle import parse_euler, get_steering_angle
-# from sensor.pedal import get_data,pedal_receiver
+from sensor.steering_angle import parse_euler, get_steering_angle
+from sensor.pedal import get_data,pedal_receiver
 drive_status = "自动驾驶"  
 scene_status = "简单场景"  
 system_fault = False
@@ -327,20 +327,20 @@ def destroy_all_vehicles_traffics(world, vehicle_flag=True, traffic_flag=True):
         actor.destroy()
 
 
+# def get_sensor_data():
+#     K1 = 0.55
+#     steer = round(joystick.get_axis(0),3) 
+#     steerCmd = K1 * math.tan(1.1 * steer)
+#     return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
+
 def get_sensor_data():
     K1 = 0.55
-    steer = round(joystick.get_axis(0),3) 
+    steer = get_steering_angle() / 450
     steerCmd = K1 * math.tan(1.1 * steer)
-    return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
-
-# def get_sensor_data():
-#     K1 = 0.5
-#     steer = get_steering_angle() / 450
-#     steerCmd = K1 * math.tan(1.1 * steer)
-#     acc,brake = get_data()
-#     if acc > 0.1:
-#         brake =0
-#     return  steerCmd, acc, brake 
+    acc,brake = get_data()
+    if acc > 0.1:
+        brake =0
+    return  steerCmd, acc, brake 
 
 
 def scene_jian( main_car_control):  # 简单场景
@@ -393,11 +393,11 @@ if __name__ == '__main__':
     pygame.init()
     pygame.mixer.init()
 
-    joystick = pygame.joystick.Joystick(0)
-    joystick.init()
+    # joystick = pygame.joystick.Joystick(0)
+    # joystick.init()
 
-    # threading.Thread(target=pedal_receiver).start()
-    # threading.Thread(target=parse_euler,daemon=True).start()
+    threading.Thread(target=pedal_receiver).start()
+    threading.Thread(target=parse_euler,daemon=True).start()
 
 
     destroy_all_vehicles_traffics(world)  
