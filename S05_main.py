@@ -53,7 +53,7 @@ class Vehicle_Traffic:
 
     def create_vehicle(self, points=None,  vehicle_model=None):
         colors = [
-            '0,0,0',    
+            # '0,0,0',    
             '10,10,150',
             '230,230,0',  
             '255,165,0', 
@@ -267,10 +267,10 @@ class Window:
             progress= pro,
             color=(255, 255, 255)
         )
-        self.esp_png = pygame.image.load(r"C:\Users\Lenovo\Desktop\tongji_shi\Carla_Neurofeedback\resource\esp-1.png") 
+        self.esp_png = pygame.image.load(r"E:\Frank_Projects\Carla_Neurofeedback_Frank\resource\esp-1.png") 
         self.esp_png = pygame.transform.scale(self.esp_png, (60, 60))  
-        self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -200, 90))  # 调整位置
-        self.attention_png = pygame.image.load(r"C:\Users\Lenovo\Desktop\tongji_shi\Carla_Neurofeedback\resource\attention.png")
+        self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
+        self.attention_png = pygame.image.load(r"E:\Frank_Projects\Carla_Neurofeedback_Frank\resource\attention.png")
         self.attention_png = pygame.transform.scale(self.attention_png, (100, 100))  
         
         # self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
@@ -278,11 +278,11 @@ class Window:
 
         if self.show_esc:
             self.show_png = True
-            self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3), bold=True,color=(255, 0, 0))
+            self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3 -50), bold=True,color=(255, 0, 0))
         if self.show_png:
             self.screen.blit(self.attention_png, (self.SCREEN_WIDTH // 2 -600, 100))  
         if self.collision_info:
-            self.draw_text(self.collision_info, 150, (self.SCREEN_WIDTH // 2 -300, self.SCREEN_HEIGHT // 3), bold=True, color=(255, 255, 255))
+            self.draw_text(self.collision_info, 150, (self.SCREEN_WIDTH // 2 -200, self.SCREEN_HEIGHT // 3 -50), bold=True, color=(255, 255, 255))
         pygame.display.flip()
         fps = self.clock.get_fps()
 
