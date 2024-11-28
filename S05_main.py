@@ -10,11 +10,12 @@ from pygame.locals import *
 import numpy as np
 import os
 import math
-from sensor.steering_angle import parse_euler, get_steering_angle
-from sensor.pedal import get_data,pedal_receiver
+# from sensor.steering_angle import parse_euler, get_steering_angle
+# from sensor.pedal import get_data,pedal_receiver
 drive_status = "自动驾驶"  
 scene_status = "简单场景"  
 system_fault = False
+easy_location1 = carla.Location(x=100, y=13, z=5)
 
 def change_weather(world, gradual_steps=10, duration=10):
 
@@ -164,6 +165,7 @@ class Main_Car_Control:
                 # car_control(self.vehicle, steer, abs(throttle),0.1)
             if self.collision_occurred:
                 break
+            print(round(self.vehicle.get_location().x,2),round(self.vehicle.get_location().y,2))
             # time.sleep(0.01)
 
     def collision_event(self, event):
@@ -196,8 +198,8 @@ class Window:
         """
         self.world = world
         self.vehicle = vehicle
-        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  
+        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  
         self.screen = None  # 初始化屏幕窗口
         self.fonts = {} 
         pygame.init()  # 初始化pygame
@@ -267,10 +269,10 @@ class Window:
             progress= pro,
             color=(255, 255, 255)
         )
-        self.esp_png = pygame.image.load(r"E:\Frank_Projects\Carla_Neurofeedback_Frank\resource\esp-1.png") 
+        self.esp_png = pygame.image.load(r".\resource\esp-1.png") 
         self.esp_png = pygame.transform.scale(self.esp_png, (60, 60))  
         self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
-        self.attention_png = pygame.image.load(r"E:\Frank_Projects\Carla_Neurofeedback_Frank\resource\attention.png")
+        self.attention_png = pygame.image.load(r".\resource\attention.png")
         self.attention_png = pygame.transform.scale(self.attention_png, (100, 100))  
         
         # self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
@@ -327,20 +329,20 @@ def destroy_all_vehicles_traffics(world, vehicle_flag=True, traffic_flag=True):
         actor.destroy()
 
 
-# def get_sensor_data():
-#     K1 = 0.55
-#     steer = round(joystick.get_axis(0),3) 
-#     steerCmd = K1 * math.tan(1.1 * steer)
-#     return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
-
 def get_sensor_data():
     K1 = 0.55
-    steer = get_steering_angle() / 450
+    steer = round(joystick.get_axis(0),3) 
     steerCmd = K1 * math.tan(1.1 * steer)
-    acc,brake = get_data()
-    if acc > 0.1:
-        brake =0
-    return  steerCmd, acc, brake 
+    return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
+
+# def get_sensor_data():
+#     K1 = 0.55
+#     steer = get_steering_angle() / 450
+#     steerCmd = K1 * math.tan(1.1 * steer)
+#     acc,brake = get_data()
+#     if acc > 0.1:
+#         brake =0
+#     return  steerCmd, acc, brake 
 
 
 def scene_jian( main_car_control):  # 简单场景
@@ -393,11 +395,11 @@ if __name__ == '__main__':
     pygame.init()
     pygame.mixer.init()
 
-    # joystick = pygame.joystick.Joystick(0)
-    # joystick.init()
+    joystick = pygame.joystick.Joystick(0)
+    joystick.init()
 
-    threading.Thread(target=pedal_receiver).start()
-    threading.Thread(target=parse_euler,daemon=True).start()
+    # threading.Thread(target=pedal_receiver).start()
+    # threading.Thread(target=parse_euler,daemon=True).start()
 
 
     destroy_all_vehicles_traffics(world)  
