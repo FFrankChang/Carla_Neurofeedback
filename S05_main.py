@@ -53,11 +53,13 @@ class Vehicle_Traffic:
 
     def create_vehicle(self, points=None,  vehicle_model=None):
         colors = [
-            # '0,0,0',    
-            '10,10,150',
-            '230,230,0',  
-            '255,165,0', 
-            '255,255,255' 
+            # '0,0,0',  #black 
+            #'10,10,150',#purpose
+            '251,210,106',  #yellow
+            '235,92,32', #橙色
+            '255,255,255',#白色
+            '0,140,140', #蓝色
+
         ]
         vehicles = []
         if vehicle_model:
@@ -223,6 +225,11 @@ class Window:
         self.end_esc_time = self.show_esc_time + self.show_duration
         self.speed = 0
         self.show_png = False
+        self.esp_png = pygame.image.load(r"E:\Frank_Projects\Carla_Neurofeedback_Frank\resource\esp-1.png") 
+        self.esp_png = pygame.transform.scale(self.esp_png, (100, 100))
+        self.attention_png = pygame.image.load(r"E:\Frank_Projects\Carla_Neurofeedback_Frank\resource\attention.png")
+        self.attention_png = pygame.transform.scale(self.attention_png, (90, 90)) 
+      
         threading.Thread(target=self.show_screen).start()
 
     def show_screen(self):
@@ -261,26 +268,25 @@ class Window:
         pro = (time.time() - self.start_time ) / 150
         self.draw_progress_bar(
             x=self.SCREEN_WIDTH // 2 - 200,
-            y=100,
+            y=110,
             width=500,
             height=20,
             progress= pro,
             color=(255, 255, 255)
         )
-        self.esp_png = pygame.image.load(r"E:\Frank_Projects\Carla_Neurofeedback_Frank\resource\esp-1.png") 
-        self.esp_png = pygame.transform.scale(self.esp_png, (60, 60))  
-        self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
-        self.attention_png = pygame.image.load(r"E:\Frank_Projects\Carla_Neurofeedback_Frank\resource\attention.png")
-        self.attention_png = pygame.transform.scale(self.attention_png, (100, 100))  
-        
+
+        self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 - 320, 80))  # 调整位置
+  
         # self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
-        # self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
+        self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
 
         if self.show_esc:
             self.show_png = True
-            self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3 -50), bold=True,color=(255, 0, 0))
+            # self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3 -50), bold=True,color=(255, 0, 0))
+            self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 - pygame.font.Font(None, 40).size("Vehicle Power System Error!")[0] // 2 -20, self.SCREEN_HEIGHT // 3 - 150), bold=True, color=(255, 0, 0))
+
         if self.show_png:
-            self.screen.blit(self.attention_png, (self.SCREEN_WIDTH // 2 -600, 100))  
+            self.screen.blit(self.attention_png, (self.SCREEN_WIDTH // 2 - 320, 200))  #(左右，上下)  
         if self.collision_info:
             self.draw_text(self.collision_info, 150, (self.SCREEN_WIDTH // 2 -200, self.SCREEN_HEIGHT // 3 -50), bold=True, color=(255, 255, 255))
         pygame.display.flip()
@@ -393,18 +399,20 @@ if __name__ == '__main__':
     pygame.init()
     pygame.mixer.init()
 
-    # joystick = pygame.joystick.Joystick(0)
-    # joystick.init()
-
-    threading.Thread(target=pedal_receiver).start()
+    # try:
+    #     joystick = pygame.joystick.Joystick(0)
+    #     joystick.init()
+    # except Exception as e:
+    #     print(f"没有外接方向盘{e}")
+    threading.Thread(target=pedal_receiver).start() 
     threading.Thread(target=parse_euler,daemon=True).start()
 
 
     destroy_all_vehicles_traffics(world)  
     random_traffic_points = generate_random_locations_around_vehicle(
         easy_location1, 
-        num_vehicles=75, 
-        x_range=(100, 900),  
+        num_vehicles=110, 
+        x_range=(150, 1300),  
         y_range=(-12.5, 12.5),    
         z=3        
     )
