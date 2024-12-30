@@ -12,8 +12,8 @@ import math
 import socket
 import json
 
-# from sensor.steering_angle import parse_euler, get_steering_angle
-# from sensor.pedal import get_data,pedal_receiver
+from sensor.steering_angle import parse_euler, get_steering_angle
+from sensor.pedal import get_data,pedal_receiver
 drive_status = "自动驾驶"  
 scene_status = "简单场景"  
 system_fault = False
@@ -202,8 +202,8 @@ class Window:
         """
         self.world = world
         self.vehicle = vehicle
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  
-        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  
+        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  
         self.screen = None  # 初始化屏幕窗口
         self.fonts = {} 
         pygame.init()  # 初始化pygame
@@ -273,11 +273,11 @@ class Window:
             progress= pro,
             color=(255, 255, 255)
         )
-        # self.esp_png = pygame.image.load(r".\resource\esp-1.png") 
-        # self.esp_png = pygame.transform.scale(self.esp_png, (60, 60))  
-        # self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
-        # self.attention_png = pygame.image.load(r".\resource\attention.png")
-        # self.attention_png = pygame.transform.scale(self.attention_png, (100, 100))  
+        self.esp_png = pygame.image.load(r".\resource\esp-1.png") 
+        self.esp_png = pygame.transform.scale(self.esp_png, (60, 60))  
+        self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
+        self.attention_png = pygame.image.load(r".\resource\attention.png")
+        self.attention_png = pygame.transform.scale(self.attention_png, (100, 100))  
         
         # self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
         self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
@@ -285,8 +285,8 @@ class Window:
         if self.show_esc:
             self.show_png = True
             self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3 -50), bold=True,color=(255, 0, 0))
-        # if self.show_png:
-        #     self.screen.blit(self.attention_png, (self.SCREEN_WIDTH // 2 -600, 100))  
+        if self.show_png:
+            self.screen.blit(self.attention_png, (self.SCREEN_WIDTH // 2 -600, 100))  
         if self.collision_info:
             self.draw_text(self.collision_info, 150, (self.SCREEN_WIDTH // 2 -200, self.SCREEN_HEIGHT // 3 -50), bold=True, color=(255, 255, 255))
         pygame.display.flip()
@@ -333,21 +333,21 @@ def destroy_all_vehicles_traffics(world, vehicle_flag=True, traffic_flag=True):
         actor.destroy()
 
 
-def get_sensor_data():
-    K1 = 0.55
-    steer = joystick.get_axis(0)
-    acc = round((-joystick.get_axis(6) + 1)/2,3) 
-    steerCmd = round(K1 * math.tan(1.1 * steer),3)
-    return steerCmd, acc, 0
-
 # def get_sensor_data():
 #     K1 = 0.55
-#     steer = get_steering_angle() / 450
-#     steerCmd = K1 * math.tan(1.1 * steer)
-#     acc,brake = get_data()
-#     if acc > 0.1:
-#         brake =0
-#     return  steerCmd, acc, brake 
+#     steer = joystick.get_axis(0)
+#     acc = round((-joystick.get_axis(6) + 1)/2,3) 
+#     steerCmd = round(K1 * math.tan(1.1 * steer),3)
+#     return steerCmd, acc, 0
+
+def get_sensor_data():
+    K1 = 0.55
+    steer = get_steering_angle() / 450
+    steerCmd = K1 * math.tan(1.1 * steer)
+    acc,brake = get_data()
+    if acc > 0.1:
+        brake =0
+    return  steerCmd, acc, brake 
 
 
 def scene_jian( main_car_control):  # 简单场景
@@ -514,7 +514,7 @@ def get_locations(main_vehicle, vehicles):
 
 def forward_traffic_location(main_vehicle, traffic):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # 创建UDP套接字
-    target_ip = "127.0.0.1"  
+    target_ip = "192.168.31.144"  
     target_port = 5005  
     
     while True:
@@ -536,11 +536,11 @@ if __name__ == '__main__':
     pygame.init()
     pygame.mixer.init()
 
-    joystick = pygame.joystick.Joystick(0)
-    joystick.init()
+    # joystick = pygame.joystick.Joystick(0)
+    # joystick.init()
 
-    # threading.Thread(target=pedal_receiver).start()
-    # threading.Thread(target=parse_euler,daemon=True).start()
+    threading.Thread(target=pedal_receiver).start()
+    threading.Thread(target=parse_euler,daemon=True).start()
 
 
     destroy_all_vehicles_traffics(world)  
