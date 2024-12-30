@@ -163,7 +163,7 @@ class Main_Car_Control:
             if system_fault:
                 if self.speed >75:
                     car_control(self.vehicle, steer ,0,1)
-                car_control(self.vehicle, steer, 0.58, 0)
+                car_control(self.vehicle, steer, 0.5, 0)
             else:
                 car_control(self.vehicle, steer, throttle, brake)
                 # car_control(self.vehicle, steer, abs(throttle),0.1)
@@ -229,6 +229,10 @@ class Window:
         self.end_esc_time = self.show_esc_time + self.show_duration
         self.speed = 0
         self.show_png = False
+        self.esp_png = pygame.image.load(r".\resource\esp-1.png") 
+        self.esp_png = pygame.transform.scale(self.esp_png, (60, 60))  
+        self.attention_png = pygame.image.load(r".\resource\attention.png")
+        self.attention_png = pygame.transform.scale(self.attention_png, (100, 100)) 
         threading.Thread(target=self.show_screen).start()
 
     def show_screen(self):
@@ -273,12 +277,7 @@ class Window:
             progress= pro,
             color=(255, 255, 255)
         )
-        self.esp_png = pygame.image.load(r".\resource\esp-1.png") 
-        self.esp_png = pygame.transform.scale(self.esp_png, (60, 60))  
         self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
-        self.attention_png = pygame.image.load(r".\resource\attention.png")
-        self.attention_png = pygame.transform.scale(self.attention_png, (100, 100))  
-        
         # self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
         self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
 
@@ -546,7 +545,7 @@ if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  
     random_traffic_points = generate_difficulty_increasing_obstacles(
         base_location=easy_location1, 
-        num_vehicles=200,  
+        num_vehicles=150,  
         x_range=(150, 2000),
         y_range=(0, 25),
         z=3,
@@ -558,7 +557,7 @@ if __name__ == '__main__':
     )
 
 
-    weather_thread = threading.Thread(target=change_weather, args=(world, 100, 30))
+    weather_thread = threading.Thread(target=change_weather, args=(world, 100, 100))
     weather_thread.start()
     vehicle_traffic = Vehicle_Traffic(world)  
     vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.tesla.model3")[0]
