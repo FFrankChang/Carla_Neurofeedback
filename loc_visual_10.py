@@ -6,7 +6,7 @@ import matplotlib.image as mpimg
 import numpy as np
 
 # UDP IP and port
-UDP_IP = "127.0.0.1"
+UDP_IP = "0.0.0.0"
 UDP_PORT = 5005
 
 # Create socket and bind
