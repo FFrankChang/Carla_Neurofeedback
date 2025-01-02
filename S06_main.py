@@ -59,9 +59,9 @@ class Vehicle_Traffic:
     def create_vehicle(self, points=None,  vehicle_model=None):
         colors = [
             # '0,0,0',    
-            '10,10,150',
-            '230,230,0',  
-            '255,165,0', 
+            # '10,10,150',
+            # '230,230,0',  
+            # '255,165,0', 
             '255,255,255' 
         ]
         vehicles = []
@@ -161,7 +161,7 @@ class Main_Car_Control:
             self.speed = self.get_speed()
             self.window.speed = self.speed
             if system_fault:
-                if self.speed >75:
+                if self.speed >55:
                     car_control(self.vehicle, steer ,0,1)
                 car_control(self.vehicle, steer, 0.5, 0)
             else:
@@ -175,7 +175,7 @@ class Main_Car_Control:
     def collision_event(self, event):
         if not self.collision_occurred:
             self.collision_occurred = True
-            self.collision_time = time.time() - self.start_time
+            self.collision_time = time.time() - self.start_time - self.window.start_show_esc_after
             collision_message = f"Collision! {self.collision_time:.2f} s"
             self.window.set_collision_info(collision_message)  # 设置窗口中显示的碰撞信息
             print(collision_message)
@@ -222,7 +222,7 @@ class Window:
         spawn_point = carla.Transform(carla.Location(x=1.8, y = -0.3, z=1.25), carla.Rotation(pitch=-8, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = self.world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
         self.show_esc = False
-        self.start_show_esc_after = 15
+        self.start_show_esc_after = random.uniform(20, 25)
         self.show_duration = 3
         self.start_time = time.time()
         self.show_esc_time = self.start_time + self.start_show_esc_after
@@ -268,7 +268,10 @@ class Window:
         i3 = i3[..., ::-1]
         img_surface = pygame.surfarray.make_surface(np.flip(i3, axis=0))
         self.screen.blit(img_surface, (0, 0))  # 绘制图片
-        pro = (time.time() - self.start_time ) / 150
+        pro = (time.time() - self.start_time -self.start_show_esc_after)
+        if pro<=0:
+            pro = 0
+        pro = pro / 150
         self.draw_progress_bar(
             x=self.SCREEN_WIDTH // 2 - 200,
             y=100,
@@ -522,6 +525,15 @@ def forward_traffic_location(main_vehicle, traffic):
         sock.sendto(message.encode(), (target_ip, target_port))
         time.sleep(0.1)
 
+def random_locations(base_location, num_vehicles=10, x_range=(-100, 100), y_range=(-50, 50), z=5):
+    random_locations = []
+    base_x, base_y, base_z = base_location.x, base_location.y, base_location.z
+    for i in range(num_vehicles):
+        random_x = np.random.uniform(x_range[0], x_range[1])
+        random_y = base_y + random.uniform(*y_range)
+        print(random_x,random_y)
+        random_locations.append(carla.Location(x=random_x, y=random_y, z=z))
+    return random_locations
 
 if __name__ == '__main__':
     client = carla.Client("127.0.0.1", 2000)  # 连接carla
@@ -545,8 +557,8 @@ if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  
     random_traffic_points = generate_difficulty_increasing_obstacles(
         base_location=easy_location1, 
-        num_vehicles=150,  
-        x_range=(150, 2000),
+        num_vehicles=200,  
+        x_range=(500, 2500),
         y_range=(0, 25),
         z=3,
         min_distance=7,
@@ -557,9 +569,12 @@ if __name__ == '__main__':
     )
 
 
-    weather_thread = threading.Thread(target=change_weather, args=(world, 100, 100))
+    weather_thread = threading.Thread(target=change_weather, args=(world, 100, 130))
     weather_thread.start()
     vehicle_traffic = Vehicle_Traffic(world)  
+    traffic_1 = random_locations(easy_location1, num_vehicles=8, x_range=(0, 500), y_range=(-12.5, 12.5), z=3)
+    vehicle_traffic.create_vehicle(points=traffic_1)
+
     vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.tesla.model3")[0]
     random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
     threading.Thread(target=forward_traffic_location, args=(vehicle,random_traffic), daemon=True).start()
