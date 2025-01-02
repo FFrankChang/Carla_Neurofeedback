@@ -1,7 +1,6 @@
 import threading
 import carla
 import pygame
-from s05_config import *
 import random
 import csv
 import time
@@ -10,19 +9,23 @@ from pygame.locals import *
 import numpy as np
 import os
 import math
-# from sensor.steering_angle import parse_euler, get_steering_angle
-# from sensor.pedal import get_data,pedal_receiver
+import socket
+import json
+
+from sensor.steering_angle import parse_euler, get_steering_angle
+from sensor.pedal import get_data,pedal_receiver
 drive_status = "自动驾驶"  
 scene_status = "简单场景"  
 system_fault = False
 easy_location1 = carla.Location(x=100, y=13, z=5)
 
+
 def change_weather(world, gradual_steps=10, duration=10):
 
     weather = carla.WeatherParameters(
         cloudiness=0.0,
-        precipitation=0.0,
-        precipitation_deposits=0.0,
+        precipitation=60,
+        precipitation_deposits=0,
         wind_intensity=0.0,
         sun_azimuth_angle=30.0,
         sun_altitude_angle=90.0
@@ -31,8 +34,9 @@ def change_weather(world, gradual_steps=10, duration=10):
 
     for i in range(1, gradual_steps + 1):
         weather.cloudiness = i * (100 / gradual_steps)
-        weather.precipitation = i * (100 / gradual_steps)
-        weather.precipitation_deposits = i * (10 / gradual_steps)
+        # weather.precipitation = i * (100 / gradual_steps)
+        # print(weather.precipitation_deposits)
+        # weather.precipitation_deposits = i * (10 / gradual_steps)
         weather.sun_altitude_angle = max(90 - i * (90 / gradual_steps), 0)
         world.set_weather(weather)
         time.sleep(duration / gradual_steps)
@@ -54,13 +58,11 @@ class Vehicle_Traffic:
 
     def create_vehicle(self, points=None,  vehicle_model=None):
         colors = [
-            # '0,0,0',  #black 
-            #'10,10,150',#purpose
-            '251,210,106',  #yellow
-            '235,92,32', #橙色
-            '255,255,255',#白色
-            '0,140,140', #蓝色
-
+            # '0,0,0',    
+            # '10,10,150',
+            # '230,230,0',  
+            # '255,165,0', 
+            '255,255,255' 
         ]
         vehicles = []
         if vehicle_model:
@@ -159,21 +161,21 @@ class Main_Car_Control:
             self.speed = self.get_speed()
             self.window.speed = self.speed
             if system_fault:
-                if self.speed >75:
+                if self.speed >55:
                     car_control(self.vehicle, steer ,0,1)
-                car_control(self.vehicle, steer, 0.58, 0)
+                car_control(self.vehicle, steer, 0.5, 0)
             else:
                 car_control(self.vehicle, steer, throttle, brake)
                 # car_control(self.vehicle, steer, abs(throttle),0.1)
             if self.collision_occurred:
                 break
-            print(round(self.vehicle.get_location().x,2),round(self.vehicle.get_location().y,2))
+            # print(round(self.vehicle.get_location().x,2),round(self.vehicle.get_location().y,2))
             # time.sleep(0.01)
 
     def collision_event(self, event):
         if not self.collision_occurred:
             self.collision_occurred = True
-            self.collision_time = time.time() - self.start_time
+            self.collision_time = time.time() - self.start_time - self.window.start_show_esc_after
             collision_message = f"Collision! {self.collision_time:.2f} s"
             self.window.set_collision_info(collision_message)  # 设置窗口中显示的碰撞信息
             print(collision_message)
@@ -185,7 +187,7 @@ class Main_Car_Control:
         for vehicle in self.world.get_actors().filter('vehicle.*'):
             vehicle.apply_control(carla.VehicleControl(hand_brake=True, throttle=0.0))
         print("Scenario paused due to collision.")
-    
+
     def get_speed(self):
         velocity = self.vehicle.get_velocity()
         speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
@@ -200,8 +202,8 @@ class Window:
         """
         self.world = world
         self.vehicle = vehicle
-        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  
-        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  
+        # self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 1920, 360  
+        self.SCREEN_WIDTH, self.SCREEN_HEIGHT = 5760, 1080  
         self.screen = None  # 初始化屏幕窗口
         self.fonts = {} 
         pygame.init()  # 初始化pygame
@@ -220,18 +222,17 @@ class Window:
         spawn_point = carla.Transform(carla.Location(x=1.8, y = -0.3, z=1.25), carla.Rotation(pitch=-8, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = self.world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
         self.show_esc = False
-        self.start_show_esc_after = 10
+        self.start_show_esc_after = random.uniform(20, 25)
         self.show_duration = 3
         self.start_time = time.time()
         self.show_esc_time = self.start_time + self.start_show_esc_after
         self.end_esc_time = self.show_esc_time + self.show_duration
         self.speed = 0
         self.show_png = False
-        self.esp_png = pygame.image.load(r"E:\Frank_Projects\Carla_Neurofeedback_Frank\resource\esp-1.png") 
-        self.esp_png = pygame.transform.scale(self.esp_png, (100, 100))
-        self.attention_png = pygame.image.load(r"E:\Frank_Projects\Carla_Neurofeedback_Frank\resource\attention.png")
-        self.attention_png = pygame.transform.scale(self.attention_png, (90, 90)) 
-      
+        self.esp_png = pygame.image.load(r".\resource\esp-1.png") 
+        self.esp_png = pygame.transform.scale(self.esp_png, (60, 60))  
+        self.attention_png = pygame.image.load(r".\resource\attention.png")
+        self.attention_png = pygame.transform.scale(self.attention_png, (100, 100)) 
         threading.Thread(target=self.show_screen).start()
 
     def show_screen(self):
@@ -267,28 +268,27 @@ class Window:
         i3 = i3[..., ::-1]
         img_surface = pygame.surfarray.make_surface(np.flip(i3, axis=0))
         self.screen.blit(img_surface, (0, 0))  # 绘制图片
-        pro = (time.time() - self.start_time ) / 150
+        pro = (time.time() - self.start_time -self.start_show_esc_after)
+        if pro<=0:
+            pro = 0
+        pro = pro / 150
         self.draw_progress_bar(
             x=self.SCREEN_WIDTH // 2 - 200,
-            y=110,
+            y=100,
             width=500,
             height=20,
             progress= pro,
             color=(255, 255, 255)
         )
-
-        self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 - 320, 80))  # 调整位置
-  
+        self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
         # self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
         self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
 
         if self.show_esc:
             self.show_png = True
-            # self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3 -50), bold=True,color=(255, 0, 0))
-            self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 - pygame.font.Font(None, 40).size("Vehicle Power System Error!")[0] // 2 -20, self.SCREEN_HEIGHT // 3 - 150), bold=True, color=(255, 0, 0))
-
+            self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3 -50), bold=True,color=(255, 0, 0))
         if self.show_png:
-            self.screen.blit(self.attention_png, (self.SCREEN_WIDTH // 2 - 320, 200))  #(左右，上下)  
+            self.screen.blit(self.attention_png, (self.SCREEN_WIDTH // 2 -600, 100))  
         if self.collision_info:
             self.draw_text(self.collision_info, 150, (self.SCREEN_WIDTH // 2 -200, self.SCREEN_HEIGHT // 3 -50), bold=True, color=(255, 255, 255))
         pygame.display.flip()
@@ -335,20 +335,21 @@ def destroy_all_vehicles_traffics(world, vehicle_flag=True, traffic_flag=True):
         actor.destroy()
 
 
-def get_sensor_data():
-    K1 = 0.55
-    steer = round(joystick.get_axis(0),3) 
-    steerCmd = K1 * math.tan(1.1 * steer)
-    return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
-
 # def get_sensor_data():
 #     K1 = 0.55
-#     steer = get_steering_angle() / 450
-#     steerCmd = K1 * math.tan(1.1 * steer)
-#     acc,brake = get_data()
-#     if acc > 0.1:
-#         brake =0
-#     return  steerCmd, acc, brake 
+#     steer = joystick.get_axis(0)
+#     acc = round((-joystick.get_axis(6) + 1)/2,3) 
+#     steerCmd = round(K1 * math.tan(1.1 * steer),3)
+#     return steerCmd, acc, 0
+
+def get_sensor_data():
+    K1 = 0.55
+    steer = get_steering_angle() / 450
+    steerCmd = K1 * math.tan(1.1 * steer)
+    acc,brake = get_data()
+    if acc > 0.1:
+        brake =0
+    return  steerCmd, acc, brake 
 
 
 def scene_jian( main_car_control):  # 简单场景
@@ -363,31 +364,176 @@ def set_speed(vehicle, speed_kmh):
     vehicle.set_target_velocity(
         carla.Vector3D(forward_vector.x * speed, forward_vector.y * speed, forward_vector.z * speed))
 
-def generate_random_locations_around_vehicle(base_location, num_vehicles=100, x_range=(-100, 100), y_range=(-50, 50), z=5, min_distance=7, safe_zone_radius=10):
+
+def generate_difficulty_increasing_obstacles(
+    base_location, 
+    num_vehicles=150, 
+    x_range=(150, 1200),
+    y_range=(-12.5, 12.5),
+    z=3,
+    min_distance=7,
+    safe_zone_radius=10,
+    num_lanes=5,
+    segments=21,  
+    segment_length=50  # 每段长度50米
+):
     random_locations = []
     base_x, base_y, base_z = base_location.x, base_location.y, base_location.z
     
-    x_values = np.linspace(x_range[0], x_range[1], num=200)  # 生成等间隔的x值
-    weights = np.linspace(1, 10, num=200)  # 生成权重，随x增大而增大
+    # 定义车道中心位置
+    lane_centers = np.linspace(y_range[0] + (y_range[1]-y_range[0])/(2*num_lanes), 
+                               y_range[1] - (y_range[1]-y_range[0])/(2*num_lanes), 
+                               num_lanes)
     
-    while len(random_locations) < num_vehicles:
-        random_x = np.random.choice(x_values, p=weights/weights.sum())
-        random_y = base_y + random.uniform(*y_range)
-
-        valid_location = True
-
-        if ((base_x - random_x) ** 2 + (base_y - random_y) ** 2) ** 0.5 < safe_zone_radius:
-            continue
-        for location in random_locations:
-            if ((location.x - random_x) ** 2 + (location.y - random_y) ** 2) ** 0.5 < min_distance:
-                valid_location = False
-                break
+    # 计算每个段的障碍车数量，后面的段分配更多障碍车
+    obstacles_per_segment = []
+    total = 0
+    for i in range(segments):
+        # 使用线性增长或其他函数（如指数）来分配障碍车
+        weight = i + 1  # 线性增长
+        obstacles = weight * 2  # 每段基础障碍车数量
+        obstacles_per_segment.append(obstacles)
+        total += obstacles
+    # 归一化以确保总数接近num_vehicles
+    scale = num_vehicles / total
+    obstacles_per_segment = [math.ceil(o * scale) for o in obstacles_per_segment]
+    
+    # 初始开放车道（可以随机选择）
+    previous_open_lane = random.randint(0, num_lanes-1)
+    
+    for i in range(segments):
+        current_x_min = x_range[0] + i * segment_length
+        current_x_max = current_x_min + segment_length
+        current_num = obstacles_per_segment[i]
         
-        if valid_location:
+        # 根据段的位置决定需要阻塞的车道数
+        # 随着段数增加，逐步增加阻塞车道数量
+        if i < segments * 0.3:
+            blocked_lanes_count = 2  # 前30%段阻塞2条车道
+        elif i < segments * 0.6:
+            blocked_lanes_count = 3  # 中间30%段阻塞3条车道
+        elif i < segments * 0.8:
+            blocked_lanes_count = 4  # 后20%段阻塞4条车道
+        else:
+            blocked_lanes_count = 5  # 最后20%段阻塞所有车道（确保高难度）
+        
+        # 确保至少留出一条开放车道
+        blocked_lanes_count = min(blocked_lanes_count, num_lanes - 1)
+        
+        # 随机选择要阻塞的车道，避免连续多个段开放同一车道
+        available_lanes = set(range(num_lanes))
+        # 尝试避免与前一段的开放车道相同
+        possible_open_lanes = available_lanes.copy()
+        if previous_open_lane in possible_open_lanes:
+            possible_open_lanes.remove(previous_open_lane)
+        open_lane = random.choice(list(possible_open_lanes)) if possible_open_lanes else previous_open_lane
+        previous_open_lane = open_lane
+        
+        blocked_lanes = set()
+        while len(blocked_lanes) < blocked_lanes_count:
+            lane = random.randint(0, num_lanes-1)
+            if lane != open_lane and lane not in blocked_lanes:
+                blocked_lanes.add(lane)
+        
+        # 为当前段生成障碍车
+        for _ in range(current_num):
+            # 随机选择阻塞的车道
+            if not blocked_lanes:
+                break  # 无需阻塞车道
+            lane = random.choice(list(blocked_lanes))
+            random_y = lane_centers[lane] + np.random.uniform(-1.5, 1.5)  # 在车道中心附近随机偏移
+            
+            # x位置在当前段内均匀分布
+            random_x = np.random.uniform(current_x_min, current_x_max)
+            
+            # 检查安全区域
+            distance_to_base = math.hypot(base_x - random_x, base_y - random_y)
+            if distance_to_base < safe_zone_radius:
+                continue
+            
+            # 检查与已有障碍车的最小距离
+            too_close = False
+            for loc in random_locations:
+                if math.hypot(loc.x - random_x, loc.y - random_y) < min_distance:
+                    too_close = True
+                    break
+            if too_close:
+                continue
+            
+            # 添加障碍车位置
+            random_locations.append(carla.Location(x=random_x, y=random_y, z=z))
+        
+        while len(random_locations) < sum(obstacles_per_segment[:i+1]):
+            lane = random.choice(list(blocked_lanes))
+            random_y = lane_centers[lane] + np.random.uniform(-1.5, 1.5)
+            random_x = np.random.uniform(current_x_min, current_x_max)
+            
+            distance_to_base = math.hypot(base_x - random_x, base_y - random_y)
+            if distance_to_base < safe_zone_radius:
+                continue
+            
+            too_close = False
+            for loc in random_locations:
+                if math.hypot(loc.x - random_x, loc.y - random_y) < min_distance:
+                    too_close = True
+                    break
+            if too_close:
+                continue
+            
             random_locations.append(carla.Location(x=random_x, y=random_y, z=z))
     
     return random_locations
 
+
+def get_locations(main_vehicle, vehicles):
+    main_vehicle_location = main_vehicle.get_location()
+    main_vehicle_info = {
+        "id": main_vehicle.id,
+        "loc": {
+            "x": round(main_vehicle_location.x, 2),
+            "y": round(main_vehicle_location.y, 2),
+            "z": round(main_vehicle_location.z, 2)
+        }
+    }
+    # 获取其他车辆的位置
+    traffic_vehicles = []
+    for vehicle in vehicles:
+        location = vehicle.get_location()
+        vehicle_info = {
+            "id": vehicle.id,
+            "loc": {
+                "x": round(location.x, 2),
+                "y": round(location.y, 2),
+                "z": round(location.z, 2)
+            }
+        }
+        traffic_vehicles.append(vehicle_info)
+    loc_dic = {
+        "main_vehicle": main_vehicle_info,
+        "traffic": traffic_vehicles
+    }
+    return loc_dic
+
+def forward_traffic_location(main_vehicle, traffic):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # 创建UDP套接字
+    target_ip = "192.168.31.144"  
+    target_port = 5005  
+    
+    while True:
+        locations = get_locations(main_vehicle, traffic)
+        message = json.dumps(locations)
+        sock.sendto(message.encode(), (target_ip, target_port))
+        time.sleep(0.1)
+
+def random_locations(base_location, num_vehicles=10, x_range=(-100, 100), y_range=(-50, 50), z=5):
+    random_locations = []
+    base_x, base_y, base_z = base_location.x, base_location.y, base_location.z
+    for i in range(num_vehicles):
+        random_x = np.random.uniform(x_range[0], x_range[1])
+        random_y = base_y + random.uniform(*y_range)
+        print(random_x,random_y)
+        random_locations.append(carla.Location(x=random_x, y=random_y, z=z))
+    return random_locations
 
 if __name__ == '__main__':
     client = carla.Client("127.0.0.1", 2000)  # 连接carla
@@ -401,33 +547,43 @@ if __name__ == '__main__':
     pygame.init()
     pygame.mixer.init()
 
-    joystick = pygame.joystick.Joystick(0)
-    joystick.init()
+    # joystick = pygame.joystick.Joystick(0)
+    # joystick.init()
 
-    # threading.Thread(target=pedal_receiver).start()
-    # threading.Thread(target=parse_euler,daemon=True).start()
+    threading.Thread(target=pedal_receiver).start()
+    threading.Thread(target=parse_euler,daemon=True).start()
 
 
     destroy_all_vehicles_traffics(world)  
-    random_traffic_points = generate_random_locations_around_vehicle(
-        easy_location1, 
-        num_vehicles=110, 
-        x_range=(150, 1300),  
-        y_range=(-12.5, 12.5),    
-        z=3        
+    random_traffic_points = generate_difficulty_increasing_obstacles(
+        base_location=easy_location1, 
+        num_vehicles=200,  
+        x_range=(500, 2500),
+        y_range=(0, 25),
+        z=3,
+        min_distance=7,
+        safe_zone_radius=10,
+        num_lanes=5,
+        segments=40,  
+        segment_length=50
     )
-    weather_thread = threading.Thread(target=change_weather, args=(world, 100, 30))
+
+
+    weather_thread = threading.Thread(target=change_weather, args=(world, 100, 130))
     weather_thread.start()
     vehicle_traffic = Vehicle_Traffic(world)  
+    traffic_1 = random_locations(easy_location1, num_vehicles=8, x_range=(0, 500), y_range=(-12.5, 12.5), z=3)
+    vehicle_traffic.create_vehicle(points=traffic_1)
+
     vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.tesla.model3")[0]
     random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
+    threading.Thread(target=forward_traffic_location, args=(vehicle,random_traffic), daemon=True).start()
 
     window = Window(world, vehicle_traffic.blueprint_library, vehicle)
     main_car_control = Main_Car_Control(vehicle, world, window,True)
     collision_sensor = vehicle_traffic.attach_collision_sensor(vehicle, main_car_control.collision_event)
 
     scene_jian(main_car_control)
-    
     while True:
-        world.tick()
+        # world.tick()
         time.sleep(0.01)
