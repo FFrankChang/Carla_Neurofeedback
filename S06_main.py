@@ -20,26 +20,39 @@ system_fault = False
 easy_location1 = carla.Location(x=100, y=13, z=5)
 
 
-def change_weather(world, gradual_steps=10, duration=10):
-
+def change_weather(world, duration=130):
+    # Initial clear weather
     weather = carla.WeatherParameters(
         cloudiness=0.0,
-        precipitation=60,
-        precipitation_deposits=0,
+        precipitation=0.0,
+        precipitation_deposits=0.0,
         wind_intensity=0.0,
+        fog_density=0.0,
         sun_azimuth_angle=30.0,
         sun_altitude_angle=90.0
     )
     world.set_weather(weather)
-
-    for i in range(1, gradual_steps + 1):
-        weather.cloudiness = i * (100 / gradual_steps)
-        # weather.precipitation = i * (100 / gradual_steps)
-        # print(weather.precipitation_deposits)
-        # weather.precipitation_deposits = i * (10 / gradual_steps)
-        weather.sun_altitude_angle = max(90 - i * (90 / gradual_steps), 0)
+    
+    start_time = time.time()
+    rain_transition_start = random.uniform(80, 100)  
+    fog_transition_start = random.uniform(90, 110)  
+    transition_duration = 3.0 
+    
+    while True:
+        current_time = time.time() - start_time
+        
+        if rain_transition_start <= current_time <= rain_transition_start + transition_duration:
+            progress = (current_time - rain_transition_start) / transition_duration
+            weather.precipitation = min(100.0 * progress, 100.0)
+            weather.precipitation_deposits = min(100.0 * progress, 100.0)
+            weather.cloudiness = min(100.0 * progress, 100.0)
+            
+        if fog_transition_start <= current_time <= fog_transition_start + transition_duration:
+            progress = (current_time - fog_transition_start) / transition_duration
+            weather.fog_density = min(100.0 * progress, 100.0) / 1.5
+            
         world.set_weather(weather)
-        time.sleep(duration / gradual_steps)
+        time.sleep(0.1)
 
 
 class Vehicle_Traffic:
@@ -134,16 +147,10 @@ class Main_Car_Control:
         self.world = world
         self.autopilot_flag = False  
         self.speed_limit = 100  
-        self.lead_vehicle = None
-        self.next_event_time = time.time() + 30
-        self.steer_duration = 0  
-        self.steer_event_end_time = 0  
-        self.random_steer_active = False
-        self.random_steer_value = 0
         self.steer = 0
         self.throttle = 0
         self.brake = 0
-        self.window = window  # 传递 Window 实例
+        self.window = window  
         self.collision_occurred = False
         self.start_time = time.time()
         self.collision_time = None
@@ -151,7 +158,9 @@ class Main_Car_Control:
 
     def follow_road(self):
         global drive_status
-        # pid = VehiclePIDController(self.vehicle, args_lateral=args_lateral_dict, args_longitudinal=args_long_dict)
+        fault_start_time = None
+        rapid_acceleration_time = None
+        
         while self.running:
             drive_status = "人工驾驶"
             steer, throttle, brake = get_sensor_data()
@@ -160,17 +169,37 @@ class Main_Car_Control:
             self.brake = brake
             self.speed = self.get_speed()
             self.window.speed = self.speed
+
             if system_fault:
-                if self.speed >55:
-                    car_control(self.vehicle, steer ,0,1)
-                car_control(self.vehicle, steer, 0.5, 0)
+                current_time = time.time()
+                
+                if fault_start_time is None:
+                    fault_start_time = current_time
+                    rapid_acceleration_time = fault_start_time + random.uniform(60, 80)
+                
+                time_since_fault = current_time - fault_start_time
+                
+                if time_since_fault <= 40:
+                    target_speed = 30 + (time_since_fault / 40) * 15  # Gradually increase from 30 to 45
+                    
+                elif current_time >= rapid_acceleration_time and self.speed < 55:
+                    target_speed = 55
+                    
+                else:
+                    target_speed = min(65, self.speed + 0.1)
+                
+                if self.speed > target_speed:
+                    car_control(self.vehicle, steer, 0, 0.3)
+                elif self.speed < target_speed - 2:
+                    car_control(self.vehicle, steer, 0.6, 0)
+                else:
+                    car_control(self.vehicle, steer, 0.2, 0)
+                    
             else:
                 car_control(self.vehicle, steer, throttle, brake)
-                # car_control(self.vehicle, steer, abs(throttle),0.1)
+                
             if self.collision_occurred:
                 break
-            # print(round(self.vehicle.get_location().x,2),round(self.vehicle.get_location().y,2))
-            # time.sleep(0.01)
 
     def collision_event(self, event):
         if not self.collision_occurred:
@@ -268,21 +297,25 @@ class Window:
         i3 = i3[..., ::-1]
         img_surface = pygame.surfarray.make_surface(np.flip(i3, axis=0))
         self.screen.blit(img_surface, (0, 0))  # 绘制图片
-        pro = (time.time() - self.start_time -self.start_show_esc_after)
-        if pro<=0:
+        pro = (time.time() - self.start_time - self.start_show_esc_after)
+        if pro <= 0:
             pro = 0
         pro = pro / 150
+        
+        time_text = f"Time: {max(0, pro * 150):.1f} s"
+        self.draw_text(time_text, 30, (self.SCREEN_WIDTH // 2 - 200, 60), bold=True, color=(255, 255, 255))
+        
         self.draw_progress_bar(
             x=self.SCREEN_WIDTH // 2 - 200,
             y=100,
             width=500,
             height=20,
-            progress= pro,
+            progress=pro,
             color=(255, 255, 255)
         )
         self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
         # self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
-        self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
+        self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.8), bold=True,color=(255, 255, 255))
 
         if self.show_esc:
             self.show_png = True
@@ -569,7 +602,7 @@ if __name__ == '__main__':
     )
 
 
-    weather_thread = threading.Thread(target=change_weather, args=(world, 100, 130))
+    weather_thread = threading.Thread(target=change_weather, args=(world,))
     weather_thread.start()
     vehicle_traffic = Vehicle_Traffic(world)  
     traffic_1 = random_locations(easy_location1, num_vehicles=8, x_range=(0, 500), y_range=(-12.5, 12.5), z=3)
