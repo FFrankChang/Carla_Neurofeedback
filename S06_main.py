@@ -69,20 +69,16 @@ class Vehicle_Traffic:
         self.tm.set_synchronous_mode(True)  
         self.tm.global_percentage_speed_difference(0)
 
-    def create_vehicle(self, points=None,  vehicle_model=None):
-        colors = [
-            # '0,0,0',    
-            # '10,10,150',
-            # '230,230,0',  
-            # '255,165,0', 
-            '255,255,255' 
-        ]
+    def create_vehicle(self, points=None, vehicle_model=None):
+        colors = ['255,255,255']
         vehicles = []
         if vehicle_model:
             blueprint_car = self.blueprint_library.filter('*vehicle*')
             cars = [bp for bp in blueprint_car if vehicle_model in bp.id.lower()]
         else:
             cars = self.blueprint_library.filter('*Crown*')
+
+        autopilot_indices = random.sample(range(len(points)), int(len(points) * 0.1))
 
         for index, point in enumerate(points):
             car_blueprint = random.choice(cars)
@@ -92,11 +88,17 @@ class Vehicle_Traffic:
             waypoint = self.env_map.get_waypoint(point)  
             transform = carla.Transform(point, waypoint.transform.rotation)
             vehicle = self.world.try_spawn_actor(car_blueprint, transform)
+            
             if vehicle:
                 vehicles.append(vehicle)
-                # 加入Traffic Manager管理的车辆
-                vehicle.set_autopilot(True, self.tm.get_port())
-                self.tm.auto_lane_change(vehicle, False)
+                if index in autopilot_indices:
+                    vehicle.set_autopilot(True, self.tm.get_port())
+                    self.tm.vehicle_percentage_speed_difference(vehicle, random.uniform(40, 60))
+                    self.tm.random_left_lanechange_percentage(vehicle, 100)
+                    self.tm.random_right_lanechange_percentage(vehicle, 100)
+                    self.tm.distance_to_leading_vehicle(vehicle, 0)
+                    self.tm.auto_lane_change(vehicle, True)
+                
                 vehicle.set_light_state(carla.VehicleLightState(carla.VehicleLightState.Brake | carla.VehicleLightState.HighBeam))
             else:
                 print(f"索引为：{index}的车子未成功生成！")
@@ -186,12 +188,17 @@ class Main_Car_Control:
                     target_speed = 55
                     
                 else:
-                    target_speed = min(65, self.speed + 0.1)
+                    # Calculate time since reaching 55 km/h
+                    time_since_55 = current_time - rapid_acceleration_time
+                    if time_since_55 > 0:
+                        target_speed = min(65, 55 + (time_since_55 * 0.5))
+                    else:
+                        target_speed = 55
                 
                 if self.speed > target_speed:
                     car_control(self.vehicle, steer, 0, 0.3)
                 elif self.speed < target_speed - 2:
-                    car_control(self.vehicle, steer, 0.6, 0)
+                    car_control(self.vehicle, steer, 0.7, 0)
                 else:
                     car_control(self.vehicle, steer, 0.2, 0)
                     
@@ -564,7 +571,6 @@ def random_locations(base_location, num_vehicles=10, x_range=(-100, 100), y_rang
     for i in range(num_vehicles):
         random_x = np.random.uniform(x_range[0], x_range[1])
         random_y = base_y + random.uniform(*y_range)
-        print(random_x,random_y)
         random_locations.append(carla.Location(x=random_x, y=random_y, z=z))
     return random_locations
 
@@ -618,5 +624,5 @@ if __name__ == '__main__':
 
     scene_jian(main_car_control)
     while True:
-        # world.tick()
+        world.tick()
         time.sleep(0.01)
