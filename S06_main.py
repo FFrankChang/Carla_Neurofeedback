@@ -34,7 +34,7 @@ def change_weather(world, duration=130):
     world.set_weather(weather)
     
     start_time = time.time()
-    rain_transition_start = random.uniform(80, 100)  
+    rain_transition_start = random.uniform(70, 90)  
     fog_transition_start = random.uniform(90, 110)  
     transition_duration = 3.0 
     
@@ -68,9 +68,12 @@ class Vehicle_Traffic:
         self.tm = client.get_trafficmanager(tm_port)  # 默认Traffic Manager端口8000
         self.tm.set_synchronous_mode(True)  
         self.tm.global_percentage_speed_difference(0)
+        self.autopilot_vehicles = []  # 存储所有可能自动驾驶的车辆
+        self.activation_distance = 100  # 激活距离（米）
+        self.main_vehicle = None
 
     def create_vehicle(self, points=None, vehicle_model=None):
-        colors = ['255,255,255']
+        colors = ['255,0,0']
         vehicles = []
         if vehicle_model:
             blueprint_car = self.blueprint_library.filter('*vehicle*')
@@ -78,7 +81,7 @@ class Vehicle_Traffic:
         else:
             cars = self.blueprint_library.filter('*Crown*')
 
-        autopilot_indices = random.sample(range(len(points)), int(len(points) * 0.1))
+        autopilot_indices = random.sample(range(len(points)), int(len(points) * 0.9))
 
         for index, point in enumerate(points):
             car_blueprint = random.choice(cars)
@@ -92,12 +95,9 @@ class Vehicle_Traffic:
             if vehicle:
                 vehicles.append(vehicle)
                 if index in autopilot_indices:
-                    vehicle.set_autopilot(True, self.tm.get_port())
-                    self.tm.vehicle_percentage_speed_difference(vehicle, random.uniform(40, 60))
-                    self.tm.random_left_lanechange_percentage(vehicle, 100)
-                    self.tm.random_right_lanechange_percentage(vehicle, 100)
-                    self.tm.distance_to_leading_vehicle(vehicle, 0)
-                    self.tm.auto_lane_change(vehicle, True)
+                    self.autopilot_vehicles.append(vehicle)  # 添加到潜在自动驾驶车辆列表
+                    # 初始状态为静止
+                    vehicle.set_autopilot(False)
                 
                 vehicle.set_light_state(carla.VehicleLightState(carla.VehicleLightState.Brake | carla.VehicleLightState.HighBeam))
             else:
@@ -135,6 +135,52 @@ class Vehicle_Traffic:
         collision_sensor = self.world.spawn_actor(blueprint, carla.Transform(), attach_to=vehicle)
         collision_sensor.listen(callback)
         return collision_sensor
+
+    def set_main_vehicle(self, vehicle):
+        """设置主车引用"""
+        self.main_vehicle = vehicle
+        # 启动更新线程
+        threading.Thread(target=self.update_traffic_behavior, daemon=True).start()
+
+    def update_traffic_behavior(self):
+        """持续更新交通车辆行为"""
+        while True:
+            if not self.main_vehicle:
+                time.sleep(0.1)
+                continue
+
+            main_location = self.main_vehicle.get_location()
+            
+            for vehicle in self.autopilot_vehicles:
+                if not vehicle.is_alive:
+                    continue
+
+                vehicle_location = vehicle.get_location()
+                distance = math.sqrt(
+                    (main_location.x - vehicle_location.x) ** 2 +
+                    (main_location.y - vehicle_location.y) ** 2
+                )
+
+                # 在激活距离内的车辆启用自动驾驶
+                if distance <= self.activation_distance:
+                    if not vehicle.get_autopilot():
+                        vehicle.set_autopilot(True, self.tm.get_port())
+                        # 配置激进的驾驶行为
+                        self.tm.vehicle_percentage_speed_difference(vehicle, random.uniform(10, 90))
+                        self.tm.random_left_lanechange_percentage(vehicle, 100)
+                        self.tm.random_right_lanechange_percentage(vehicle, 100)
+                        self.tm.distance_to_leading_vehicle(vehicle, 5)
+                        self.tm.auto_lane_change(vehicle, True)
+                        self.tm.set_percentage_keep_right_rule(vehicle, 0)
+                else:
+                    # 超出范围后停止自动驾驶
+                    if vehicle.get_autopilot():
+                        vehicle.set_autopilot(False)
+                        # 让车辆缓慢停止
+                        vehicle.apply_control(carla.VehicleControl(throttle=0, brake=0.3))
+
+            time.sleep(0.1)  # 控制更新频率
+
 # 主车控制器
 class Main_Car_Control:
     def __init__(self, main_car, world, window,instantaneous_speed=False):
@@ -198,7 +244,7 @@ class Main_Car_Control:
                 if self.speed > target_speed:
                     car_control(self.vehicle, steer, 0, 0.3)
                 elif self.speed < target_speed - 2:
-                    car_control(self.vehicle, steer, 0.7, 0)
+                    car_control(self.vehicle, steer, 0.9, 0)
                 else:
                     car_control(self.vehicle, steer, 0.2, 0)
                     
@@ -615,6 +661,7 @@ if __name__ == '__main__':
     vehicle_traffic.create_vehicle(points=traffic_1)
 
     vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.tesla.model3")[0]
+    vehicle_traffic.set_main_vehicle(vehicle)  # 设置主车引用
     random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
     threading.Thread(target=forward_traffic_location, args=(vehicle,random_traffic), daemon=True).start()
 
