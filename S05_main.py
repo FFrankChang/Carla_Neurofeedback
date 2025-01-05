@@ -1,7 +1,6 @@
 import threading
 import carla
 import pygame
-from s05_config import *
 import random
 import csv
 import time
@@ -10,6 +9,9 @@ from pygame.locals import *
 import numpy as np
 import os
 import math
+import socket
+import json
+
 # from sensor.steering_angle import parse_euler, get_steering_angle
 # from sensor.pedal import get_data,pedal_receiver
 drive_status = "自动驾驶"  
@@ -17,12 +19,13 @@ scene_status = "简单场景"
 system_fault = False
 easy_location1 = carla.Location(x=100, y=13, z=5)
 
+
 def change_weather(world, gradual_steps=10, duration=10):
 
     weather = carla.WeatherParameters(
         cloudiness=0.0,
-        precipitation=0.0,
-        precipitation_deposits=0.0,
+        precipitation=60,
+        precipitation_deposits=0,
         wind_intensity=0.0,
         sun_azimuth_angle=30.0,
         sun_altitude_angle=90.0
@@ -31,8 +34,9 @@ def change_weather(world, gradual_steps=10, duration=10):
 
     for i in range(1, gradual_steps + 1):
         weather.cloudiness = i * (100 / gradual_steps)
-        weather.precipitation = i * (100 / gradual_steps)
-        weather.precipitation_deposits = i * (10 / gradual_steps)
+        # weather.precipitation = i * (100 / gradual_steps)
+        # print(weather.precipitation_deposits)
+        # weather.precipitation_deposits = i * (10 / gradual_steps)
         weather.sun_altitude_angle = max(90 - i * (90 / gradual_steps), 0)
         world.set_weather(weather)
         time.sleep(duration / gradual_steps)
@@ -165,7 +169,7 @@ class Main_Car_Control:
                 # car_control(self.vehicle, steer, abs(throttle),0.1)
             if self.collision_occurred:
                 break
-            print(round(self.vehicle.get_location().x,2),round(self.vehicle.get_location().y,2))
+            # print(round(self.vehicle.get_location().x,2),round(self.vehicle.get_location().y,2))
             # time.sleep(0.01)
 
     def collision_event(self, event):
@@ -183,7 +187,7 @@ class Main_Car_Control:
         for vehicle in self.world.get_actors().filter('vehicle.*'):
             vehicle.apply_control(carla.VehicleControl(hand_brake=True, throttle=0.0))
         print("Scenario paused due to collision.")
-    
+
     def get_speed(self):
         velocity = self.vehicle.get_velocity()
         speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
@@ -218,7 +222,7 @@ class Window:
         spawn_point = carla.Transform(carla.Location(x=1.8, y = -0.3, z=1.25), carla.Rotation(pitch=-8, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = self.world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
         self.show_esc = False
-        self.start_show_esc_after = 10
+        self.start_show_esc_after = 100
         self.show_duration = 3
         self.start_time = time.time()
         self.show_esc_time = self.start_time + self.start_show_esc_after
@@ -269,20 +273,20 @@ class Window:
             progress= pro,
             color=(255, 255, 255)
         )
-        self.esp_png = pygame.image.load(r".\resource\esp-1.png") 
-        self.esp_png = pygame.transform.scale(self.esp_png, (60, 60))  
-        self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
-        self.attention_png = pygame.image.load(r".\resource\attention.png")
-        self.attention_png = pygame.transform.scale(self.attention_png, (100, 100))  
+        # self.esp_png = pygame.image.load(r".\resource\esp-1.png") 
+        # self.esp_png = pygame.transform.scale(self.esp_png, (60, 60))  
+        # self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
+        # self.attention_png = pygame.image.load(r".\resource\attention.png")
+        # self.attention_png = pygame.transform.scale(self.attention_png, (100, 100))  
         
         # self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
-        # self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
+        self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.5), bold=True,color=(255, 255, 255))
 
         if self.show_esc:
             self.show_png = True
             self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3 -50), bold=True,color=(255, 0, 0))
-        if self.show_png:
-            self.screen.blit(self.attention_png, (self.SCREEN_WIDTH // 2 -600, 100))  
+        # if self.show_png:
+        #     self.screen.blit(self.attention_png, (self.SCREEN_WIDTH // 2 -600, 100))  
         if self.collision_info:
             self.draw_text(self.collision_info, 150, (self.SCREEN_WIDTH // 2 -200, self.SCREEN_HEIGHT // 3 -50), bold=True, color=(255, 255, 255))
         pygame.display.flip()
@@ -331,9 +335,10 @@ def destroy_all_vehicles_traffics(world, vehicle_flag=True, traffic_flag=True):
 
 def get_sensor_data():
     K1 = 0.55
-    steer = round(joystick.get_axis(0),3) 
-    steerCmd = K1 * math.tan(1.1 * steer)
-    return steerCmd, (-joystick.get_axis(1) + 1)/2, (-joystick.get_axis(2) + 1)/2
+    steer = joystick.get_axis(0)
+    acc = round((-joystick.get_axis(6) + 1)/2,3) 
+    steerCmd = round(K1 * math.tan(1.1 * steer),3)
+    return steerCmd, acc, 0
 
 # def get_sensor_data():
 #     K1 = 0.55
@@ -361,8 +366,8 @@ def generate_random_locations_around_vehicle(base_location, num_vehicles=100, x_
     random_locations = []
     base_x, base_y, base_z = base_location.x, base_location.y, base_location.z
     
-    x_values = np.linspace(x_range[0], x_range[1], num=200)  # 生成等间隔的x值
-    weights = np.linspace(1, 10, num=200)  # 生成权重，随x增大而增大
+    x_values = np.linspace(x_range[0], x_range[1], num=200)  
+    weights = np.linspace(1, 10, num=200)  
     
     while len(random_locations) < num_vehicles:
         random_x = np.random.choice(x_values, p=weights/weights.sum())
@@ -381,6 +386,46 @@ def generate_random_locations_around_vehicle(base_location, num_vehicles=100, x_
             random_locations.append(carla.Location(x=random_x, y=random_y, z=z))
     
     return random_locations
+
+def get_locations(main_vehicle, vehicles):
+    main_vehicle_location = main_vehicle.get_location()
+    main_vehicle_info = {
+        "id": main_vehicle.id,
+        "loc": {
+            "x": round(main_vehicle_location.x, 2),
+            "y": round(main_vehicle_location.y, 2),
+            "z": round(main_vehicle_location.z, 2)
+        }
+    }
+    # 获取其他车辆的位置
+    traffic_vehicles = []
+    for vehicle in vehicles:
+        location = vehicle.get_location()
+        vehicle_info = {
+            "id": vehicle.id,
+            "loc": {
+                "x": round(location.x, 2),
+                "y": round(location.y, 2),
+                "z": round(location.z, 2)
+            }
+        }
+        traffic_vehicles.append(vehicle_info)
+    loc_dic = {
+        "main_vehicle": main_vehicle_info,
+        "traffic": traffic_vehicles
+    }
+    return loc_dic
+
+def forward_traffic_location(main_vehicle, traffic):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # 创建UDP套接字
+    target_ip = "127.0.0.1"  
+    target_port = 5005  
+    
+    while True:
+        locations = get_locations(main_vehicle, traffic)
+        message = json.dumps(locations)
+        sock.sendto(message.encode(), (target_ip, target_port))
+        time.sleep(0.1)
 
 
 if __name__ == '__main__':
@@ -406,7 +451,7 @@ if __name__ == '__main__':
     random_traffic_points = generate_random_locations_around_vehicle(
         easy_location1, 
         num_vehicles=75, 
-        x_range=(100, 900),  
+        x_range=(150, 1200),  
         y_range=(-12.5, 12.5),    
         z=3        
     )
@@ -415,13 +460,13 @@ if __name__ == '__main__':
     vehicle_traffic = Vehicle_Traffic(world)  
     vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.tesla.model3")[0]
     random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
+    threading.Thread(target=forward_traffic_location, args=(vehicle,random_traffic), daemon=True).start()
 
     window = Window(world, vehicle_traffic.blueprint_library, vehicle)
     main_car_control = Main_Car_Control(vehicle, world, window,True)
     collision_sensor = vehicle_traffic.attach_collision_sensor(vehicle, main_car_control.collision_event)
 
     scene_jian(main_car_control)
-    
     while True:
         world.tick()
         time.sleep(0.01)

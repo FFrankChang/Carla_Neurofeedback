@@ -14,21 +14,21 @@ sock.bind((UDP_IP, UDP_PORT))
 fig, ax = plt.subplots()
 
 # Load images for vehicles
-traffic_img = mpimg.imread(r'C:\Users\Lenovo\Desktop\tongji_shi\Carla_Neurofeedback\resource\car1.png')  # Update the path to your image
-main_vehicle_img = mpimg.imread(r'C:\Users\Lenovo\Desktop\tongji_shi\Carla_Neurofeedback\resource\car2.png')  # Update the path to your image
+traffic_img = mpimg.imread(r'C:\Users\Lenovo\Desktop\tongji_shi\Carla_Neurofeedback\resource\car1.png')  
+main_vehicle_img = mpimg.imread(r'C:\Users\Lenovo\Desktop\tongji_shi\Carla_Neurofeedback\resource\car2.png')  
 
 # Initial scatter object setup with dummy data
 traffic_positions = [(0, 0)]
 main_vehicle_position = [(0, 0)]
 
 # Initial imshow objects, hidden off plot
-traffic_icons = [ax.imshow(traffic_img, extent=(0, 1, 0, 1), visible=False) for _ in range(100)]  # Adjust as needed
+traffic_icons = [ax.imshow(traffic_img, extent=(0, 1, 0, 1), visible=False) for _ in range(100)] 
 main_vehicle_icon = ax.imshow(main_vehicle_img, extent=(0, 1, 0, 1), visible=False)
 
 ax.set_xlim(0, 1400)
 ax.set_ylim(0, 30)
 ax.set_aspect('equal', 'box')
-
+ax.invert_yaxis()
 # Drawing horizontal lines at specified locations
 for x in range(0, 31, 5):
     ax.hlines(x, 0, 1400, colors='gray', linestyles='dashed', linewidth=0.5)
@@ -37,7 +37,7 @@ def update(frame):
     global traffic_positions, main_vehicle_position
     ax.set_aspect('equal', 'box')
 
-    data, addr = sock.recvfrom(8192)  # receive data
+    data, addr = sock.recvfrom(16000)  # receive data
     if not data:
         return  # If no data, do nothing
 
