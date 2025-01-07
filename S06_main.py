@@ -11,6 +11,7 @@ import os
 import math
 import socket
 import json
+import sys
 
 from sensor.steering_angle import parse_euler, get_steering_angle
 from sensor.pedal import get_data,pedal_receiver
@@ -142,26 +143,27 @@ class Vehicle_Traffic:
 
 # 主车控制器
 class Main_Car_Control:
-    def __init__(self, main_car, world, window,instantaneous_speed=False):
+    def __init__(self, main_car, world, window, data_recorder, instantaneous_speed=False):
         """
         主车控制类
         :param main_car: 主车对象
         :param instantaneous_speed: 是否瞬时速度
         """
-        self.vehicle = main_car  # 主车对象
-        self.instantaneous_speed = instantaneous_speed  
+        self.vehicle = main_car
+        self.instantaneous_speed = instantaneous_speed
         self.scene_status = "简单场景"
         self.world = world
-        self.autopilot_flag = False  
-        self.speed_limit = 100  
+        self.autopilot_flag = False
+        self.speed_limit = 100
         self.steer = 0
         self.throttle = 0
         self.brake = 0
-        self.window = window  
+        self.window = window
         self.collision_occurred = False
         self.start_time = time.time()
         self.collision_time = None
         self.running = True
+        self.data_recorder = data_recorder  # 添加数据记录器
 
     def follow_road(self):
         global drive_status
@@ -176,6 +178,16 @@ class Main_Car_Control:
             self.brake = brake
             self.speed = self.get_speed()
             self.window.speed = self.speed
+            
+            # 记录数据
+            self.data_recorder.record_data(
+                time.time(),
+                self.speed,
+                self.vehicle.get_location(),
+                self.steer,
+                self.throttle,
+                self.brake
+            )
 
             if system_fault:
                 current_time = time.time()
@@ -218,9 +230,10 @@ class Main_Car_Control:
             self.collision_occurred = True
             self.collision_time = time.time() - self.start_time - self.window.start_show_esc_after
             collision_message = f"Collision! {self.collision_time:.2f} s"
-            self.window.set_collision_info(collision_message)  # 设置窗口中显示的碰撞信息
+            self.window.set_collision_info(collision_message)
+            self.data_recorder.record_collision(self.collision_time)  # 记录碰撞时间
             print(collision_message)
-            self.stop_scenario()  # 停止场景
+            self.stop_scenario()
 
     def stop_scenario(self):
         self.running = False
@@ -233,6 +246,7 @@ class Main_Car_Control:
         velocity = self.vehicle.get_velocity()
         speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
         return int(speed * 3.6)
+
 class Window:
     def __init__(self, world, blueprint_library, vehicle):
         """
@@ -579,7 +593,60 @@ def random_locations(base_location, num_vehicles=10, x_range=(-100, 100), y_rang
         random_locations.append(carla.Location(x=random_x, y=random_y, z=z))
     return random_locations
 
+class DataRecorder:
+    def __init__(self, subject, date, condition, frequency=100):
+        self.last_record_time = time.time()
+        self.interval = 1.0 / frequency
+        self.collision_occurred = False
+        self.collision_time = None
+        self.subject = subject
+        self.date = date
+        self.condition = condition
+        self.file = None
+        self.filename = None
+        self.init_file()
+
+    def init_file(self):
+        self.filename = f"./data/carla_s06_{self.subject}_{self.date}_{self.condition}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        temp_filename = f"{self.filename}.csv"
+        self.file = open(temp_filename, 'w', newline='')
+        self.writer = csv.writer(self.file)
+        self.writer.writerow(['timestamp', 'Speed', 'Location_x', 'Location_y', 'Location_z', 
+                            'Steer', 'Throttle', 'Brake', 'Collision_Time'])
+
+    def record_collision(self, collision_time):
+        self.collision_occurred = True
+        self.collision_time = collision_time
+
+    def record_data(self, timestamp, speed, location, steer, throttle, brake):
+        current_time = time.time()
+        if current_time - self.last_record_time >= self.interval:
+            self.writer.writerow([
+                timestamp, speed, 
+                location.x, location.y, location.z,
+                steer, throttle, brake,
+                self.collision_time if self.collision_occurred else ''
+            ])
+            self.last_record_time = current_time
+            self.file.flush()
+
+    def close(self):
+        if self.file:
+            self.file.close()
+            # 重命名文件以包含碰撞时间
+            if self.collision_occurred and self.collision_time is not None:
+                old_filename = f"{self.filename}.csv"
+                new_filename = f"{self.filename}_{int(self.collision_time)}.csv"
+                try:
+                    os.rename(old_filename, new_filename)
+                except Exception as e:
+                    print(f"Error renaming file: {e}")
+
 if __name__ == '__main__':
+    subject_id = "SUBJECT" if len(sys.argv) < 2 else sys.argv[1]
+    date = "DAY" if len(sys.argv) < 3 else sys.argv[2]
+    condition = "CONDITION" if len(sys.argv) < 4 else sys.argv[3]
+    
     client = carla.Client("127.0.0.1", 2000)  # 连接carla
     client.set_timeout(60)  
     world = client.get_world()  # 获取世界对象
@@ -624,8 +691,9 @@ if __name__ == '__main__':
     random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
     threading.Thread(target=forward_traffic_location, args=(vehicle,random_traffic), daemon=True).start()
 
+    data_recorder = DataRecorder(subject=subject_id, date=date, condition=condition)
     window = Window(world, vehicle_traffic.blueprint_library, vehicle)
-    main_car_control = Main_Car_Control(vehicle, world, window,True)
+    main_car_control = Main_Car_Control(vehicle, world, window, data_recorder, True)
     collision_sensor = vehicle_traffic.attach_collision_sensor(vehicle, main_car_control.collision_event)
 
     scene_jian(main_car_control)
