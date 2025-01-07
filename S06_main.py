@@ -12,6 +12,8 @@ import math
 import socket
 import json
 import sys
+import atexit
+import signal
 
 from sensor.steering_angle import parse_euler, get_steering_angle
 from sensor.pedal import get_data,pedal_receiver
@@ -642,61 +644,93 @@ class DataRecorder:
                 except Exception as e:
                     print(f"Error renaming file: {e}")
 
+def handle_exit():
+    """处理程序退出时的清理工作"""
+    print("Cleaning up...")
+    if 'data_recorder' in globals():
+        print("Closing data recorder...")
+        data_recorder.close()
+    pygame.quit()
+    sys.exit(0)  # 确保程序完全退出
+
+def signal_handler(signum, frame):
+    """处理终止信号"""
+    print(f"\nReceived signal {signum}")
+    handle_exit()
+
 if __name__ == '__main__':
-    subject_id = "SUBJECT" if len(sys.argv) < 2 else sys.argv[1]
-    date = "DAY" if len(sys.argv) < 3 else sys.argv[2]
-    condition = "CONDITION" if len(sys.argv) < 4 else sys.argv[3]
+    # 注册信号处理器
+    for sig in [signal.SIGTERM, signal.SIGINT, signal.SIGBREAK, signal.CTRL_C_EVENT, signal.CTRL_BREAK_EVENT]:
+        try:
+            signal.signal(sig, signal_handler)
+        except (ValueError, AttributeError):
+            continue
     
-    client = carla.Client("127.0.0.1", 2000)  # 连接carla
-    client.set_timeout(60)  
-    world = client.get_world()  # 获取世界对象
-    env_map = world.get_map()  # 获取地图对象
-    spectator = world.get_spectator()  # ue4中观察者对象
-    blueprint_library = world.get_blueprint_library()  # 获取蓝图，可以拿到可创建的对象
-    prop_model = blueprint_library.filter('*prop*') 
+    # 注册常规退出处理
+    atexit.register(handle_exit)
+    
+    try:
+        subject_id = "SUBJECT" if len(sys.argv) < 2 else sys.argv[1]
+        date = "DAY" if len(sys.argv) < 3 else sys.argv[2]
+        condition = "CONDITION" if len(sys.argv) < 4 else sys.argv[3]
+        
+        client = carla.Client("127.0.0.1", 2000)
+        client.set_timeout(60)  
+        world = client.get_world()  # 获取世界对象
+        env_map = world.get_map()  # 获取地图对象
+        spectator = world.get_spectator()  # ue4中观察者对象
+        blueprint_library = world.get_blueprint_library()  # 获取蓝图，可以拿到可创建的对象
+        prop_model = blueprint_library.filter('*prop*') 
 
-    pygame.init()
-    pygame.mixer.init()
+        pygame.init()
+        pygame.mixer.init()
 
-    # joystick = pygame.joystick.Joystick(0)
-    # joystick.init()
+        # joystick = pygame.joystick.Joystick(0)
+        # joystick.init()
 
-    threading.Thread(target=pedal_receiver).start()
-    threading.Thread(target=parse_euler,daemon=True).start()
-
-
-    destroy_all_vehicles_traffics(world)  
-    random_traffic_points = generate_difficulty_increasing_obstacles(
-        base_location=easy_location1, 
-        num_vehicles=200,  
-        x_range=(500, 2500),
-        y_range=(0, 25),
-        z=3,
-        min_distance=7,
-        safe_zone_radius=10,
-        num_lanes=5,
-        segments=40,  
-        segment_length=50
-    )
+        threading.Thread(target=pedal_receiver).start()
+        threading.Thread(target=parse_euler,daemon=True).start()
 
 
-    weather_thread = threading.Thread(target=change_weather, args=(world,))
-    weather_thread.start()
-    vehicle_traffic = Vehicle_Traffic(world)  
-    traffic_1 = random_locations(easy_location1, num_vehicles=8, x_range=(0, 500), y_range=(-12.5, 12.5), z=3)
-    vehicle_traffic.create_vehicle(points=traffic_1)
+        destroy_all_vehicles_traffics(world)  
+        random_traffic_points = generate_difficulty_increasing_obstacles(
+            base_location=easy_location1, 
+            num_vehicles=200,  
+            x_range=(500, 2500),
+            y_range=(0, 25),
+            z=3,
+            min_distance=7,
+            safe_zone_radius=10,
+            num_lanes=5,
+            segments=40,  
+            segment_length=50
+        )
 
-    vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.tesla.model3")[0]
-    vehicle_traffic.set_main_vehicle(vehicle)  # 设置主车引用
-    random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
-    threading.Thread(target=forward_traffic_location, args=(vehicle,random_traffic), daemon=True).start()
 
-    data_recorder = DataRecorder(subject=subject_id, date=date, condition=condition)
-    window = Window(world, vehicle_traffic.blueprint_library, vehicle)
-    main_car_control = Main_Car_Control(vehicle, world, window, data_recorder, True)
-    collision_sensor = vehicle_traffic.attach_collision_sensor(vehicle, main_car_control.collision_event)
+        weather_thread = threading.Thread(target=change_weather, args=(world,))
+        weather_thread.start()
+        vehicle_traffic = Vehicle_Traffic(world)  
+        traffic_1 = random_locations(easy_location1, num_vehicles=8, x_range=(0, 500), y_range=(-12.5, 12.5), z=3)
+        vehicle_traffic.create_vehicle(points=traffic_1)
 
-    scene_jian(main_car_control)
-    while True:
-        world.tick()
-        time.sleep(0.01)
+        vehicle = vehicle_traffic.create_main_vehicle([easy_location1], vehicle_model="vehicle.tesla.model3")[0]
+        vehicle_traffic.set_main_vehicle(vehicle)  # 设置主车引用
+        random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
+        threading.Thread(target=forward_traffic_location, args=(vehicle,random_traffic), daemon=True).start()
+
+        data_recorder = DataRecorder(subject=subject_id, date=date, condition=condition)
+        window = Window(world, vehicle_traffic.blueprint_library, vehicle)
+        main_car_control = Main_Car_Control(vehicle, world, window, data_recorder, True)
+        collision_sensor = vehicle_traffic.attach_collision_sensor(vehicle, main_car_control.collision_event)
+
+        scene_jian(main_car_control)
+        while True:
+            world.tick()
+            time.sleep(0.01)
+            
+    except KeyboardInterrupt:
+        print("\nReceived exit command")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        handle_exit()
