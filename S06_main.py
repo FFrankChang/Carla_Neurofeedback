@@ -139,47 +139,6 @@ class Vehicle_Traffic:
     def set_main_vehicle(self, vehicle):
         """设置主车引用"""
         self.main_vehicle = vehicle
-        # 启动更新线程
-        threading.Thread(target=self.update_traffic_behavior, daemon=True).start()
-
-    def update_traffic_behavior(self):
-        """持续更新交通车辆行为"""
-        while True:
-            if not self.main_vehicle:
-                time.sleep(0.1)
-                continue
-
-            main_location = self.main_vehicle.get_location()
-            
-            for vehicle in self.autopilot_vehicles:
-                if not vehicle.is_alive:
-                    continue
-
-                vehicle_location = vehicle.get_location()
-                distance = math.sqrt(
-                    (main_location.x - vehicle_location.x) ** 2 +
-                    (main_location.y - vehicle_location.y) ** 2
-                )
-
-                # 在激活距离内的车辆启用自动驾驶
-                if distance <= self.activation_distance:
-                    if not vehicle.get_autopilot():
-                        vehicle.set_autopilot(True, self.tm.get_port())
-                        # 配置激进的驾驶行为
-                        self.tm.vehicle_percentage_speed_difference(vehicle, random.uniform(10, 90))
-                        self.tm.random_left_lanechange_percentage(vehicle, 100)
-                        self.tm.random_right_lanechange_percentage(vehicle, 100)
-                        self.tm.distance_to_leading_vehicle(vehicle, 5)
-                        self.tm.auto_lane_change(vehicle, True)
-                        self.tm.set_percentage_keep_right_rule(vehicle, 0)
-                else:
-                    # 超出范围后停止自动驾驶
-                    if vehicle.get_autopilot():
-                        vehicle.set_autopilot(False)
-                        # 让车辆缓慢停止
-                        vehicle.apply_control(carla.VehicleControl(throttle=0, brake=0.3))
-
-            time.sleep(0.1)  # 控制更新频率
 
 # 主车控制器
 class Main_Car_Control:
