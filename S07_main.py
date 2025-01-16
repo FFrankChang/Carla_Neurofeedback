@@ -15,45 +15,11 @@ import sys
 
 from sensor.steering_angle import parse_euler, get_steering_angle
 from sensor.pedal import get_data,pedal_receiver
+
 drive_status = "自动驾驶"  
 scene_status = "简单场景"  
 system_fault = False
 easy_location1 = carla.Location(x=100, y=13, z=5)
-
-
-def change_weather(world, duration=130):
-    # Initial clear weather
-    weather = carla.WeatherParameters(
-        cloudiness=0.0,
-        precipitation=0.0,
-        precipitation_deposits=0.0,
-        wind_intensity=0.0,
-        fog_density=0.0,
-        sun_azimuth_angle=30.0,
-        sun_altitude_angle=90.0
-    )
-    world.set_weather(weather)
-    
-    start_time = time.time()
-    rain_transition_start = random.uniform(70, 90)  
-    fog_transition_start = random.uniform(90, 110)  
-    transition_duration = 3.0 
-    
-    while True:
-        current_time = time.time() - start_time
-        
-        if rain_transition_start <= current_time <= rain_transition_start + transition_duration:
-            progress = (current_time - rain_transition_start) / transition_duration
-            weather.precipitation = min(100.0 * progress, 100.0)
-            weather.precipitation_deposits = min(100.0 * progress, 100.0)
-            weather.cloudiness = min(100.0 * progress, 100.0)
-            
-        if fog_transition_start <= current_time <= fog_transition_start + transition_duration:
-            progress = (current_time - fog_transition_start) / transition_duration
-            weather.fog_density = min(100.0 * progress, 100.0) / 5
-            
-        world.set_weather(weather)
-        time.sleep(0.1)
 
 
 class Vehicle_Traffic:
@@ -143,7 +109,7 @@ class Vehicle_Traffic:
 
 # 主车控制器
 class Main_Car_Control:
-    def __init__(self, main_car, world, window, data_recorder, instantaneous_speed=False):
+    def __init__(self, main_car, world, window, instantaneous_speed=False):
         """
         主车控制类
         :param main_car: 主车对象
@@ -163,7 +129,6 @@ class Main_Car_Control:
         self.start_time = time.time()
         self.collision_time = None
         self.running = True
-        self.data_recorder = data_recorder  # 添加数据记录器
 
     def follow_road(self):
         global drive_status
@@ -178,49 +143,8 @@ class Main_Car_Control:
             self.brake = brake
             self.speed = self.get_speed()
             self.window.speed = self.speed
-            
-            # 记录数据
-            self.data_recorder.record_data(
-                time.time(),
-                self.speed,
-                self.vehicle.get_location(),
-                self.steer,
-                self.throttle,
-                self.brake
-            )
 
-            if system_fault:
-                current_time = time.time()
-                
-                if fault_start_time is None:
-                    fault_start_time = current_time
-                    rapid_acceleration_time = fault_start_time + random.uniform(60, 80)
-                
-                time_since_fault = current_time - fault_start_time
-                
-                if time_since_fault <= 40:
-                    target_speed = 30 + (time_since_fault / 40) * 15  # Gradually increase from 30 to 45
-                    
-                elif current_time >= rapid_acceleration_time and self.speed < 55:
-                    target_speed = 55
-                    
-                else:
-                    # Calculate time since reaching 55 km/h
-                    time_since_55 = current_time - rapid_acceleration_time
-                    if time_since_55 > 0:
-                        target_speed = min(65, 55 + (time_since_55 * 0.5))
-                    else:
-                        target_speed = 55
-                
-                if self.speed > target_speed:
-                    car_control(self.vehicle, steer, 0, 0.3)
-                elif self.speed < target_speed - 2:
-                    car_control(self.vehicle, steer, 0.9, 0)
-                else:
-                    car_control(self.vehicle, steer, 0.2, 0)
-                    
-            else:
-                car_control(self.vehicle, steer, throttle, brake)
+            car_control(self.vehicle, steer, throttle, brake)
                 
             if self.collision_occurred:
                 break
@@ -229,18 +153,9 @@ class Main_Car_Control:
         if not self.collision_occurred:
             self.collision_occurred = True
             self.collision_time = time.time() - self.start_time - self.window.start_show_esc_after
-            collision_message = f"Collision! {self.collision_time:.2f} s"
+            collision_message = f"Collision!"
             self.window.set_collision_info(collision_message)
-            self.data_recorder.record_collision(self.collision_time)  # 记录碰撞时间
             print(collision_message)
-            self.stop_scenario()
-
-    def stop_scenario(self):
-        self.running = False
-        self.world.wait_for_tick()  
-        for vehicle in self.world.get_actors().filter('vehicle.*'):
-            vehicle.apply_control(carla.VehicleControl(hand_brake=True, throttle=0.0))
-        print("Scenario paused due to collision.")
 
     def get_speed(self):
         velocity = self.vehicle.get_velocity()
@@ -277,7 +192,7 @@ class Window:
         spawn_point = carla.Transform(carla.Location(x=1.8, y = -0.3, z=1.25), carla.Rotation(pitch=-8, yaw=0, roll=0))  # 传感器相对车子的位置设置
         self.sensor = self.world.spawn_actor(self.blueprint_camera, spawn_point, attach_to=self.vehicle)  # 添加传感器
         self.show_esc = False
-        self.start_show_esc_after = random.uniform(20, 25)
+        self.start_show_esc_after = 3
         self.show_duration = 3
         self.start_time = time.time()
         self.show_esc_time = self.start_time + self.start_show_esc_after
@@ -328,26 +243,9 @@ class Window:
             pro = 0
         pro = pro / 150
         
-        time_text = f"Time: {max(0, pro * 150):.1f} s"
-        self.draw_text(time_text, 30, (self.SCREEN_WIDTH // 2 - 200, 60), bold=True, color=(255, 255, 255))
-        
-        self.draw_progress_bar(
-            x=self.SCREEN_WIDTH // 2 - 200,
-            y=100,
-            width=500,
-            height=20,
-            progress=pro,
-            color=(255, 255, 255)
-        )
-        self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
+        # self.screen.blit(self.esp_png, (self.SCREEN_WIDTH // 2 -300, 90))  # 调整位置
         # self.draw_text("slipperiness of the ground", 30, (self.SCREEN_WIDTH // 2 -600, 90), bold=True,color=(255, 255, 255))
         self.draw_text(f"{self.speed}", 50, (self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 1.8), bold=True,color=(255, 255, 255))
-
-        if self.show_esc:
-            self.show_png = True
-            self.draw_text("Vehicle Power System Error!", 60, (self.SCREEN_WIDTH // 2 -500, self.SCREEN_HEIGHT // 3 -50), bold=True,color=(255, 0, 0))
-        if self.show_png:
-            self.screen.blit(self.attention_png, (self.SCREEN_WIDTH // 2 -600, 100))  
         if self.collision_info:
             self.draw_text(self.collision_info, 150, (self.SCREEN_WIDTH // 2 -200, self.SCREEN_HEIGHT // 3 -50), bold=True, color=(255, 255, 255))
         pygame.display.flip()
@@ -371,9 +269,6 @@ class Window:
 
         self.collision_info = info
 
-    def draw_progress_bar(self, x, y, width, height, progress, color=(0, 255, 0)):
-        pygame.draw.rect(self.screen, (50, 50, 50), (x, y, width, height))  # 背景条
-        pygame.draw.rect(self.screen, color, (x, y, int(width * progress), height))  # 前景条
 
 def car_control(vehicle, steer=0, throttle=1, brake=0):
     current_control = vehicle.get_control()
@@ -607,7 +502,7 @@ class DataRecorder:
         self.init_file()
 
     def init_file(self):
-        self.filename = f"./data/carla_c06_{self.subject}_{self.date}_{self.condition}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        self.filename = f"./data/carla_s06_{self.subject}_{self.date}_{self.condition}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         temp_filename = f"{self.filename}.csv"
         self.file = open(temp_filename, 'w', newline='')
         self.writer = csv.writer(self.file)
@@ -670,8 +565,8 @@ if __name__ == '__main__':
     destroy_all_vehicles_traffics(world)  
     random_traffic_points = generate_difficulty_increasing_obstacles(
         base_location=easy_location1, 
-        num_vehicles=200,  
-        x_range=(500, 2500),
+        num_vehicles=50,  
+        x_range=(1000, 2500),
         y_range=(0, 25),
         z=3,
         min_distance=7,
@@ -681,9 +576,6 @@ if __name__ == '__main__':
         segment_length=50
     )
 
-
-    weather_thread = threading.Thread(target=change_weather, args=(world,))
-    weather_thread.start()
     vehicle_traffic = Vehicle_Traffic(world)  
     traffic_1 = random_locations(easy_location1, num_vehicles=8, x_range=(0, 500), y_range=(-12.5, 12.5), z=3)
     vehicle_traffic.create_vehicle(points=traffic_1)
@@ -693,9 +585,8 @@ if __name__ == '__main__':
     random_traffic = vehicle_traffic.create_vehicle(points=random_traffic_points)
     threading.Thread(target=forward_traffic_location, args=(vehicle,random_traffic), daemon=True).start()
 
-    data_recorder = DataRecorder(subject=subject_id, date=date, condition=condition)
     window = Window(world, vehicle_traffic.blueprint_library, vehicle)
-    main_car_control = Main_Car_Control(vehicle, world, window, data_recorder, True)
+    main_car_control = Main_Car_Control(vehicle, world, window, True)
     collision_sensor = vehicle_traffic.attach_collision_sensor(vehicle, main_car_control.collision_event)
 
     scene_jian(main_car_control)

@@ -19,9 +19,9 @@ process = None
 
 # Script paths configuration, can be adjusted as needed
 scripts = {
-    "1": r"D:\carla\carla\PythonAPI\examples\manual_control_steeringwheel_traffic.py",
-    "2": "E:\\Carla_Neurofeedback\\s01_main.py",
-    "3": "E:\\Carla_Neurofeedback\\s02_main.py"
+    "1": "E:\\Frank_Projects\\Carla_Neurofeedback_Frank\\S07_main.py",
+    "2": "E:\\Frank_Projects\\Carla_Neurofeedback_Frank\\S06_main.py",
+    "3": "E:\\Frank_Projects\\Carla_Neurofeedback_Frank\\s02_main.py"
 }
 
 # CSV file to log script events
@@ -39,7 +39,7 @@ try:
         parts = message.split(" | ")
         command = parts[0].strip()
 
-        if command in ["2", "3"]:
+        if command in ["1","2", "3"]:
             # Expected message format for 2 and 3 is: "2 | Condition: feedback | Subject: S01 | Day: D01"
             condition = parts[1].split(": ")[1].strip()
             subject = parts[2].split(": ")[1].strip()
@@ -59,22 +59,6 @@ try:
                 start_time = time.time()
                 print(f"Started script {script_path} with parameters {subject}, {day}, {condition}.")
 
-                if command == "1":
-                    with open(csv_file_path, 'a', newline='') as csvfile:
-                        csvwriter = csv.writer(csvfile)
-                        csvwriter.writerow(['start_script_1', datetime.datetime.now()])
-
-                    time.sleep(RUN_TIME)
-                    process.terminate()
-                    print("Automatically terminated script 1 after 10 minutes.")
-                    process = None
-
-                    with open(csv_file_path, 'a', newline='') as csvfile:
-                        csvwriter = csv.writer(csvfile)
-                        csvwriter.writerow(['stop_script_1', datetime.datetime.now()])
-
-                    elapsed_time = time.time() - start_time
-                    print(f"Script 1 ran for {elapsed_time:.2f} seconds.")
             else:
                 print("Another script is already running.")
         elif command == "0":
@@ -86,11 +70,6 @@ try:
                         csvwriter = csv.writer(csvfile)
                         csvwriter.writerow(['stop_script_1', datetime.datetime.now()])
                 process = None
-
-                # Send message "pause" to local port 12347
-                # message = "pause".encode()
-                # send_sock.sendto(message, (send_ip, send_port))
-                # print(f"Sent 'pause' to {send_ip}:{send_port}")
 
             else:
                 print("No script is running.")
