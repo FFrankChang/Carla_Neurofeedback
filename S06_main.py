@@ -163,7 +163,8 @@ class Main_Car_Control:
         self.start_time = time.time()
         self.collision_time = None
         self.running = True
-        self.data_recorder = data_recorder  # 添加数据记录器
+        self.data_recorder = data_recorder
+        self.collision_sound = pygame.mixer.Sound(r".\resource\collision.mp3")
 
     def follow_road(self):
         global drive_status
@@ -233,6 +234,7 @@ class Main_Car_Control:
             self.window.set_collision_info(collision_message)
             self.data_recorder.record_collision(self.collision_time)  # 记录碰撞时间
             print(collision_message)
+            self.collision_sound.play()
             self.stop_scenario()
 
     def stop_scenario(self):
